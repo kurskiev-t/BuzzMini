@@ -11,6 +11,7 @@ class DictateSettings:
 
     KEY_MODEL_ID = "selected_model_id"
     KEY_PTT_CHORD = "ptt_chord_id"
+    KEY_INPUT_DEVICE = "input_device_index"
 
     PTT_CHORD_SPACE = "ctrl_r+space"
     PTT_CHORD_WIN = "ctrl_r+win"
@@ -39,3 +40,15 @@ class DictateSettings:
         if c not in self.PTT_CHORD_CHOICES:
             c = self.PTT_CHORD_SPACE
         self._s.setValue(self.KEY_PTT_CHORD, c)
+
+    def input_device_index(self) -> Optional[int]:
+        """None = PortAudio default input."""
+        v = self._s.value(self.KEY_INPUT_DEVICE, -1)
+        try:
+            i = int(v)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return None
+        return None if i < 0 else i
+
+    def set_input_device_index(self, index: Optional[int]) -> None:
+        self._s.setValue(self.KEY_INPUT_DEVICE, -1 if index is None else int(index))

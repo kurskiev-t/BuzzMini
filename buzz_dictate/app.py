@@ -34,15 +34,15 @@ from buzz_dictate.settings_store import DictateSettings
 logger = logging.getLogger(__name__)
 
 
-def _parse_audio_device() -> Optional[int]:
+def _effective_input_device(settings: DictateSettings) -> Optional[int]:
+    """BUZZDICTATE_AUDIO_DEVICE (int) overrides Settings."""
     raw = os.environ.get("BUZZDICTATE_AUDIO_DEVICE", "").strip()
-    if not raw:
-        return None
-    try:
-        return int(raw)
-    except ValueError:
-        logger.warning("BUZZDICTATE_AUDIO_DEVICE must be an integer; ignoring")
-        return None
+    if raw:
+        try:
+            return int(raw)
+        except ValueError:
+            logger.warning("BUZZDICTATE_AUDIO_DEVICE must be an integer; ignoring")
+    return settings.input_device_index()
 
 
 def _parse_language() -> Optional[str]:
@@ -118,14 +118,19 @@ class DictateController(QObject):
     overlay_transcribing = pyqtSignal()
     overlay_hide = pyqtSignal()
 
-    def __init__(self, engine: WhisperEngine, tray: QSystemTrayIcon) -> None:
+    def __init__(self, engine: WhisperEngine, tray: QSystemTrayIcon, settings: DictateSettings) -> None:
         super().__init__()
         self._engine = engine
         self._tray = tray
-        self._capture = PTTCapture(_parse_audio_device())
+        self._settings = settings
+        self._capture = PTTCapture(_effective_input_device(settings))
         self._recording = False
         self._busy = False
         self._ready = False
+
+    def refresh_input_device(self) -> None:
+        """Re-read device from settings / env (call after Settings OK)."""
+        self._capture.set_input_device(_effective_input_device(self._settings))
 
     def set_ready(self, ok: bool) -> None:
         self._ready = ok
@@ -151,6 +156,7 @@ class DictateController(QObject):
             return
         self._recording = True
         try:
+            self._capture.set_input_device(_effective_input_device(self._settings))
             self._capture.start()
             self.overlay_listening.emit()
         except Exception as e:
@@ -262,7 +268,7 @@ def main() -> None:
     tray.setToolTip("Buzz Dictate — loading model…")
 
     overlay = RecordingOverlay()
-    controller = DictateController(engine, tray)
+    controller = DictateController(engine, tray, settings)
     bridge = HotkeyBridge()
 
     hotkey_listener = None
@@ -412,6 +418,7 @@ def main() -> None:
         dlg = SettingsDialog(settings)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             refresh_ptt_chord_from_settings()
+            controller.refresh_input_device()
             if controller.is_ready():
                 attach_hotkey_listener()
                 update_tooltip_ready()
@@ -432,6 +439,17 @@ def main() -> None:
 
     def on_text(text: str) -> None:
         overlay.hide_overlay()
+        t = (text or "").strip()
+        logger.info("Transcription done (%d non-space chars)", len(t))
+        if not t:
+            tray.showMessage(
+                "Buzz Dictate",
+                "Recognition returned empty text. Try another microphone in Settings, "
+                "or set BUZZDICTATE_LANGUAGE (e.g. ru). Text would not be pasted.",
+                QSystemTrayIcon.MessageIcon.Information,
+                6000,
+            )
+            return
         _paste_via_clipboard(app, text)
 
     def on_err(msg: str) -> None:

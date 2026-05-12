@@ -35,6 +35,11 @@ class PTTCapture:
         self._lock = threading.Lock()
         self._stream: Optional[sd.InputStream] = None
 
+    def set_input_device(self, device_index: Optional[int]) -> None:
+        """Update device and sample rate (only while stream is stopped)."""
+        self.device_index = device_index
+        self.sample_rate = resolve_sample_rate(device_index)
+
     def start(self) -> None:
         self.stop()
         self._buf = np.array([], dtype=np.float32)
