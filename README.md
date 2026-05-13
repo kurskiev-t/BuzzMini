@@ -92,6 +92,46 @@ cd BuzzMini
 
 Принимаются карты РФ, СБП и зарубежные карты — в рамках возможностей выбранной платёжной площадки.
 
+## Публикация на GitHub (автору)
+
+Репозиторий на GitHub можно назвать **`BuzzMini`** и сделать **Public** — так проще делиться ссылкой и принимать вклад, при этом секреты не храните в коде (токены, ключи API).
+
+### Один раз на сайте GitHub
+
+1. Войти на [github.com](https://github.com), **New repository**.
+2. **Repository name:** `BuzzMini`.
+3. **Public**.
+4. Без галочек «Add a README / .gitignore / license», если эти файлы уже есть локально (иначе придётся разруливать первый pull).
+
+Скопируйте URL репозитория, например `https://github.com/ВАШ_ЛОГИН/BuzzMini.git`.
+
+### У себя в консоли (в каталоге проекта)
+
+Проверьте текущую ветку (`git branch`) и при необходимости переименуйте основную в привычную `main`:
+
+```bat
+git branch -M main
+```
+
+Привяжите удалённый репозиторий и отправьте код:
+
+```bat
+git remote add origin https://github.com/ВАШ_ЛОГИН/BuzzMini.git
+git push -u origin main
+```
+
+Если вместо `main` вы ведёте работу в другой ветке (например `wip/hardening`), можно запушить её отдельно и потом открыть **Pull request** в `main` на GitHub, либо слить локально и запушить `main`.
+
+Повторные выгрузки после коммитов:
+
+```bat
+git push
+```
+
+### Если GitHub предложит логин
+
+Для HTTPS удобны **Personal Access Token** (Settings → Developer settings) вместо пароля, либо **GitHub CLI** (`gh auth login`), либо SSH-ключ и URL вида `git@github.com:ВАШ_ЛОГИН/BuzzMini.git`.
+
 ## Лицензия
 
 Уточните в репозитории файл `LICENSE` после выбора лицензии.
