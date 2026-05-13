@@ -1,8 +1,8 @@
-# BuzzMini
-
 <p align="center">
-  <img src="assets/logo.svg" width="180" alt="BuzzMini" />
+  <img src="assets/logo.svg" width="800" height="400" alt="BuzzMini" />
 </p>
+
+# BuzzMini
 
 Локальное распознавание речи «на лету»: нажал горячие клавиши — продиктовал — текст вставился в активное окно (буфер обмена + симуляция вставки). Работает через **faster-whisper** и **PyTorch**; при наличии NVIDIA GPU транскрипция идёт на видеокарте.
 
