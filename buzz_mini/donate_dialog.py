@@ -18,7 +18,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-# Сбор через ВТБ (Paymo). Переменная BUZZMINI_DONATE_URL переопределяет для своей сборки.
+# URL сбора по умолчанию. Опционально BUZZMINI_DONATE_URL в окружении
+# подставляет другую ссылку (удобно при смене платформы без правки кода).
 _DEFAULT_DONATE_URL = (
     "https://vtb.paymo.ru/collect-money/?transaction=f77f0675-61b6-4914-bca1-97a2eff8c32d"
 )

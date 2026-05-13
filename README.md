@@ -82,6 +82,8 @@ cd BuzzMini
 .\.venv\Scripts\python.exe -m buzz_mini.app
 ```
 
+**Windows:** после `uv sync` можно запускать двойным щелчком **`scripts\run-buzz-mini.bat`** в клоне репозитория — всегда поднимется Python из **`.venv`**, а не системный (иначе часто уходит на CPU без CUDA).
+
 После `pip install -e .` можно также вызывать консольную команду `buzz-mini`, если активирован нужный venv.
 
 ### Где лежат модели
