@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
 )
 
 from buzz_mini.audio_ptt import PTTCapture
+from buzz_mini.donate_dialog import DonateDialog
 from buzz_mini.engine import WhisperEngine, _resolve_download_root
 from buzz_mini.models_catalog import find_local_snapshot, title_for_id
 from buzz_mini.models_dialog import ModelsDialog
@@ -306,10 +307,13 @@ def main() -> None:
     models_action = QAction("Models…")
     settings_action = QAction("Settings")
     unload_action = QAction("Unload model")
+    donate_action = QAction("Donate — Донат")
     quit_action = QAction("Quit")
     menu.addAction(models_action)
     menu.addAction(settings_action)
     menu.addAction(unload_action)
+    menu.addSeparator()
+    menu.addAction(donate_action)
     menu.addSeparator()
     menu.addAction(quit_action)
     tray.setContextMenu(menu)
@@ -448,9 +452,14 @@ def main() -> None:
                 attach_hotkey_listener()
                 update_tooltip_ready()
 
+    def open_donate() -> None:
+        dlg = DonateDialog()
+        dlg.exec()
+
     models_action.triggered.connect(open_models)
     settings_action.triggered.connect(open_settings)
     unload_action.triggered.connect(unload_model)
+    donate_action.triggered.connect(open_donate)
     quit_action.triggered.connect(app.quit)
     app.aboutToQuit.connect(graceful_shutdown)
 
