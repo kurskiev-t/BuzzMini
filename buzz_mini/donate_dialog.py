@@ -1,12 +1,13 @@
-"""Modal dialog: donation info + link to Donatty."""
+"""Donation dialog: VTB Paymo link and QR; Donatty planned when verified."""
 
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Optional
 
-from PyQt6.QtCore import QUrl, Qt
-from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtGui import QDesktopServices, QPixmap
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -17,8 +18,14 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-# Replace with your profile URL when ready (or set BUZZMINI_DONATE_URL).
-_DEFAULT_DONATTY = "https://donatty.com"
+# Сбор через ВТБ (Paymo). Переменная BUZZMINI_DONATE_URL переопределяет для своей сборки.
+_DEFAULT_DONATE_URL = (
+    "https://vtb.paymo.ru/collect-money/?transaction=f77f0675-61b6-4914-bca1-97a2eff8c32d"
+)
+
+
+def _donate_qr_path() -> Path:
+    return Path(__file__).resolve().parent.parent / "assets" / "donate-qr.png"
 
 
 class DonateDialog(QDialog):
@@ -28,7 +35,7 @@ class DonateDialog(QDialog):
         self.setModal(True)
         self.setMinimumWidth(440)
 
-        url = os.environ.get("BUZZMINI_DONATE_URL", _DEFAULT_DONATTY).strip() or _DEFAULT_DONATTY
+        url = os.environ.get("BUZZMINI_DONATE_URL", _DEFAULT_DONATE_URL).strip() or _DEFAULT_DONATE_URL
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
@@ -37,17 +44,36 @@ class DonateDialog(QDialog):
         body.setWordWrap(True)
         body.setTextFormat(Qt.TextFormat.RichText)
         body.setText(
-            "<p style='font-weight: 600; font-size: 13pt;'>Поддержать проект ❤️</p>"
-            "<p style='margin-top: 8px;'>Спасибо, что используете программу для голосового ввода! "
-            "Проект развивается исключительно на энтузиазме автора. Ваши донаты помогают мне "
-            "адаптировать новые ИИ-модели и развивать проект. Принимаются карты РФ, СБП и "
-            "зарубежные карты.</p>"
+            "<p style='font-weight: 600; font-size: 13pt;'>Поддержать проект</p>"
+            "<p style='margin-top: 8px;'>Если BuzzMini пригодился, можно перевести любую сумму "
+            "через <b>ВТБ (Paymo)</b> — по кнопке ниже или по QR-коду. "
+            "Профиль на Donatty пока на проверке; когда он заработает, добавим и его.</p>"
+            "<p style='margin-top: 6px; color: palette(mid); font-size: 10pt;'>"
+            f"<a href=\"{url}\">{url}</a></p>"
         )
+        body.setOpenExternalLinks(True)
         layout.addWidget(body)
+
+        qr_path = _donate_qr_path()
+        if qr_path.is_file():
+            pm = QPixmap(str(qr_path))
+            if not pm.isNull():
+                max_side = 220
+                if max(pm.width(), pm.height()) > max_side:
+                    pm = pm.scaled(
+                        max_side,
+                        max_side,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                qr = QLabel()
+                qr.setPixmap(pm)
+                qr.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+                layout.addWidget(qr)
 
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
-        donate_btn = QPushButton("Поддержать на Donatty")
+        donate_btn = QPushButton("Открыть страницу сбора (ВТБ)")
         donate_btn.setDefault(True)
         donate_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(url)))
         btn_row.addWidget(donate_btn)
