@@ -20,9 +20,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from buzz_dictate.download_progress import ModelDownloadProgressDialog
-from buzz_dictate.model_download import ModelSnapshotDownloadTask
-from buzz_dictate.models_catalog import (
+from buzz_mini.download_progress import ModelDownloadProgressDialog
+from buzz_mini.model_download import ModelSnapshotDownloadTask
+from buzz_mini.models_catalog import (
     MODEL_ENTRIES,
     delete_model_cache,
     find_local_snapshot,
@@ -30,7 +30,7 @@ from buzz_dictate.models_catalog import (
     repo_id_for_model,
     title_for_id,
 )
-from buzz_dictate.settings_store import DictateSettings
+from buzz_mini.settings_store import DictateSettings
 
 
 class ModelsDialog(QDialog):
@@ -41,7 +41,7 @@ class ModelsDialog(QDialog):
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Models — Buzz Dictate")
+        self.setWindowTitle("Models — Buzz Mini")
         self._settings = settings
         self._download_root = download_root
         self._selected_id = settings.selected_model_id()
@@ -51,7 +51,7 @@ class ModelsDialog(QDialog):
         self._progress: Optional[ModelDownloadProgressDialog] = None
 
         info = QLabel(
-            "Faster Whisper models are stored next to Buzz when possible.\n"
+            "Faster Whisper models use the folder below (BUZZMINI_MODEL_ROOT overrides).\n"
             f"Cache: {download_root}"
         )
         info.setWordWrap(True)
@@ -203,7 +203,7 @@ class ModelsDialog(QDialog):
             self._progress = None
         self._current_task = None
         self._download_btn.setEnabled(True)
-        QMessageBox.warning(self, "Buzz Dictate", f"Download failed:\n{msg}")
+        QMessageBox.warning(self, "Buzz Mini", f"Download failed:\n{msg}")
         self._populate_tree()
         self._sync_buttons()
 
@@ -233,12 +233,12 @@ class ModelsDialog(QDialog):
     def _on_accept(self) -> None:
         mid = self._current_model_id()
         if not mid:
-            QMessageBox.information(self, "Buzz Dictate", "Select a model.")
+            QMessageBox.information(self, "Buzz Mini", "Select a model.")
             return
         if find_local_snapshot(mid, self._download_root) is None:
             QMessageBox.information(
                 self,
-                "Buzz Dictate",
+                "Buzz Mini",
                 f"“{title_for_id(mid)}” is not downloaded yet.\nUse Download first.",
             )
             return

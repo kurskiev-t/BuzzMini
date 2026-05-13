@@ -6,8 +6,8 @@ from PyQt6.QtCore import QSettings
 
 
 class DictateSettings:
-    ORG = "BuzzDictate"
-    APP = "BuzzDictate"
+    ORG = "BuzzMini"
+    APP = "BuzzMini"
 
     KEY_MODEL_ID = "selected_model_id"
     KEY_PTT_CHORD = "ptt_chord_id"

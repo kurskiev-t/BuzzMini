@@ -5,14 +5,14 @@ from __future__ import annotations
 import logging
 import os
 
-from buzz_dictate.settings_store import DictateSettings
+from buzz_mini.settings_store import DictateSettings
 
 logger = logging.getLogger(__name__)
 
 
 def effective_ptt_chord_raw(settings: DictateSettings) -> str:
-    """Non-empty BUZZDICTATE_PTT_CHORD overrides QSettings."""
-    env = os.environ.get("BUZZDICTATE_PTT_CHORD", "").strip()
+    """Non-empty BUZZMINI_PTT_CHORD overrides QSettings."""
+    env = os.environ.get("BUZZMINI_PTT_CHORD", "").strip()
     if env:
         return env.lower().replace(" ", "")
     return settings.ptt_chord_id()

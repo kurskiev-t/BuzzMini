@@ -13,10 +13,10 @@ def main() -> None:
 
     app = QApplication(sys.argv)
 
-    from buzz_dictate.engine import WhisperEngine, _resolve_download_root
-    from buzz_dictate.models_catalog import find_local_snapshot
-    from buzz_dictate.models_dialog import ModelsDialog
-    from buzz_dictate.settings_store import DictateSettings
+    from buzz_mini.engine import WhisperEngine, _resolve_download_root
+    from buzz_mini.models_catalog import find_local_snapshot
+    from buzz_mini.models_dialog import ModelsDialog
+    from buzz_mini.settings_store import DictateSettings
 
     root = _resolve_download_root()
     print("download_root:", root)

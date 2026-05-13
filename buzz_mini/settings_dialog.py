@@ -15,32 +15,32 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from buzz_dictate.audio_devices import input_devices_for_ui
-from buzz_dictate.settings_store import DictateSettings
+from buzz_mini.audio_devices import input_devices_for_ui
+from buzz_mini.settings_store import DictateSettings
 
 
 class SettingsDialog(QDialog):
     def __init__(self, settings: DictateSettings, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Settings — Buzz Dictate")
+        self.setWindowTitle("Settings — Buzz Mini")
         self._settings = settings
 
         layout = QVBoxLayout(self)
 
-        env_ptt = os.environ.get("BUZZDICTATE_PTT_CHORD", "").strip()
+        env_ptt = os.environ.get("BUZZMINI_PTT_CHORD", "").strip()
         if env_ptt:
             layout.addWidget(
                 QLabel(
                     "Push-to-talk is fixed by the environment variable\n"
-                    "BUZZDICTATE_PTT_CHORD — remove it and restart to use the list below."
+                    "BUZZMINI_PTT_CHORD — remove it and restart to use the list below."
                 )
             )
 
-        env_dev = os.environ.get("BUZZDICTATE_AUDIO_DEVICE", "").strip()
+        env_dev = os.environ.get("BUZZMINI_AUDIO_DEVICE", "").strip()
         if env_dev:
             layout.addWidget(
                 QLabel(
-                    "Microphone is fixed by BUZZDICTATE_AUDIO_DEVICE\n"
+                    "Microphone is fixed by BUZZMINI_AUDIO_DEVICE\n"
                     "(integer index) — remove it to use the list below."
                 )
             )

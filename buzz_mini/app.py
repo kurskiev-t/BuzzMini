@@ -1,7 +1,8 @@
 """
 Qt tray app + global push-to-talk (default: Right Ctrl + Space) + minimal overlay.
-Optional: BUZZDICTATE_PTT_CHORD=ctrl_r+win for Right Ctrl + Windows.
-Paste uses clipboard + Ctrl+V via pynput (same idea as external dictation tools).
+Optional: BUZZMINI_PTT_CHORD=ctrl_r+win for Right Ctrl + Windows.
+Paste uses clipboard + modifier+V via pynput (Handy-style: delay after clipboard, VK on Windows).
+BUZZMINI_PASTE_DELAY_MS (default 60) waits for the OS clipboard before sending keys.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ import logging
 import os
 import sys
 import threading
+import time
 from typing import Optional
 
 from PyQt6.QtCore import QObject, QThread, Qt, pyqtSignal, pyqtSlot
@@ -22,31 +24,31 @@ from PyQt6.QtWidgets import (
     QSystemTrayIcon,
 )
 
-from buzz_dictate.audio_ptt import PTTCapture
-from buzz_dictate.engine import WhisperEngine, _resolve_download_root
-from buzz_dictate.models_catalog import find_local_snapshot, title_for_id
-from buzz_dictate.models_dialog import ModelsDialog
-from buzz_dictate.overlay import RecordingOverlay
-from buzz_dictate.ptt_chord import effective_ptt_chord_raw, parse_ptt_chord_raw
-from buzz_dictate.settings_dialog import SettingsDialog
-from buzz_dictate.settings_store import DictateSettings
+from buzz_mini.audio_ptt import PTTCapture
+from buzz_mini.engine import WhisperEngine, _resolve_download_root
+from buzz_mini.models_catalog import find_local_snapshot, title_for_id
+from buzz_mini.models_dialog import ModelsDialog
+from buzz_mini.overlay import RecordingOverlay
+from buzz_mini.ptt_chord import effective_ptt_chord_raw, parse_ptt_chord_raw
+from buzz_mini.settings_dialog import SettingsDialog
+from buzz_mini.settings_store import DictateSettings
 
 logger = logging.getLogger(__name__)
 
 
 def _effective_input_device(settings: DictateSettings) -> Optional[int]:
-    """BUZZDICTATE_AUDIO_DEVICE (int) overrides Settings."""
-    raw = os.environ.get("BUZZDICTATE_AUDIO_DEVICE", "").strip()
+    """BUZZMINI_AUDIO_DEVICE (int) overrides Settings."""
+    raw = os.environ.get("BUZZMINI_AUDIO_DEVICE", "").strip()
     if raw:
         try:
             return int(raw)
         except ValueError:
-            logger.warning("BUZZDICTATE_AUDIO_DEVICE must be an integer; ignoring")
+            logger.warning("BUZZMINI_AUDIO_DEVICE must be an integer; ignoring")
     return settings.input_device_index()
 
 
 def _parse_language() -> Optional[str]:
-    lang = os.environ.get("BUZZDICTATE_LANGUAGE", "").strip()
+    lang = os.environ.get("BUZZMINI_LANGUAGE", "").strip()
     return lang or None
 
 
@@ -162,7 +164,7 @@ class DictateController(QObject):
         except Exception as e:
             logger.exception("Audio start failed")
             self._recording = False
-            self._tray.showMessage("Buzz Dictate", str(e), QSystemTrayIcon.MessageIcon.Warning)
+            self._tray.showMessage("Buzz Mini", str(e), QSystemTrayIcon.MessageIcon.Warning)
 
     @pyqtSlot()
     def on_ptt_up(self) -> None:
@@ -197,17 +199,40 @@ class DictateController(QObject):
 def _paste_via_clipboard(app: QApplication, text: str) -> None:
     if not text:
         return
+    raw = os.environ.get("BUZZMINI_PASTE_DELAY_MS", "60").strip()
+    try:
+        delay_ms = max(0, int(raw))
+    except ValueError:
+        delay_ms = 60
+
     cb = QGuiApplication.clipboard()
     cb.setText(text)
+    app.processEvents()
+    if delay_ms:
+        time.sleep(delay_ms / 1000.0)
 
-    from pynput.keyboard import Controller, Key
+    from pynput.keyboard import Controller, Key, KeyCode
 
     ctrl = Controller()
     try:
-        ctrl.press(Key.ctrl)
-        ctrl.press("v")
-        ctrl.release("v")
-        ctrl.release(Key.ctrl)
+        if sys.platform == "darwin":
+            ctrl.press(Key.cmd)
+            ctrl.press("v")
+            ctrl.release("v")
+            ctrl.release(Key.cmd)
+        elif sys.platform == "win32":
+            # VK_V (0x56): layout-independent, matches Handy/enigo on Windows.
+            v_key = KeyCode.from_vk(0x56)
+            ctrl.press(Key.ctrl)
+            ctrl.press(v_key)
+            ctrl.release(v_key)
+            time.sleep(0.1)
+            ctrl.release(Key.ctrl)
+        else:
+            ctrl.press(Key.ctrl)
+            ctrl.press("v")
+            ctrl.release("v")
+            ctrl.release(Key.ctrl)
     except Exception:
         logger.exception("Paste simulation failed — text is on the clipboard")
 
@@ -248,7 +273,7 @@ def _start_hotkey_listener(bridge: HotkeyBridge, ctrl_key: object, partner_key: 
 
 def main() -> None:
     logging.basicConfig(
-        level=os.environ.get("BUZZDICTATE_LOG_LEVEL", "INFO"),
+        level=os.environ.get("BUZZMINI_LOG_LEVEL", "INFO"),
         format="%(levelname)s %(name)s: %(message)s",
     )
 
@@ -259,13 +284,13 @@ def main() -> None:
     download_root = _resolve_download_root()
     os.makedirs(download_root, exist_ok=True)
 
-    model_id = os.environ.get("BUZZDICTATE_MODEL", "").strip() or settings.selected_model_id()
+    model_id = os.environ.get("BUZZMINI_MODEL", "").strip() or settings.selected_model_id()
     settings.set_selected_model_id(model_id)
 
     engine = WhisperEngine(model_size_or_path=model_id)
     tray = QSystemTrayIcon(app)
     tray.setIcon(app.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
-    tray.setToolTip("Buzz Dictate — loading model…")
+    tray.setToolTip("Buzz Mini — loading model…")
 
     overlay = RecordingOverlay()
     controller = DictateController(engine, tray, settings)
@@ -275,7 +300,7 @@ def main() -> None:
     hotkey_started = False
 
     _ctrl_ptt, _partner_ptt, ptt_chord_label = parse_ptt_chord_raw(effective_ptt_chord_raw(settings))
-    logger.info("Push-to-talk: %s (Tray → Settings, or BUZZDICTATE_PTT_CHORD)", ptt_chord_label)
+    logger.info("Push-to-talk: %s (Tray → Settings, or BUZZMINI_PTT_CHORD)", ptt_chord_label)
 
     menu = QMenu()
     models_action = QAction("Models…")
@@ -314,7 +339,7 @@ def main() -> None:
 
     def update_tooltip_ready() -> None:
         mid = settings.selected_model_id()
-        tray.setToolTip(f"Buzz Dictate — {title_for_id(mid)} — hold {ptt_chord_label}")
+        tray.setToolTip(f"Buzz Mini — {title_for_id(mid)} — hold {ptt_chord_label}")
 
     def on_load_success() -> None:
         nonlocal hotkey_started
@@ -326,7 +351,7 @@ def main() -> None:
         attach_hotkey_listener()
         if first:
             tray.showMessage(
-                "Buzz Dictate",
+                "Buzz Mini",
                 f"Ready — {title_for_id(settings.selected_model_id())}. Hold {ptt_chord_label} to dictate.",
                 QSystemTrayIcon.MessageIcon.Information,
                 3500,
@@ -337,8 +362,8 @@ def main() -> None:
         controller.set_ready(False)
         stop_hotkey_listener()
         hotkey_started = False
-        tray.setToolTip("Buzz Dictate — model not loaded")
-        tray.showMessage("Buzz Dictate", msg, QSystemTrayIcon.MessageIcon.Warning, 8000)
+        tray.setToolTip("Buzz Mini — model not loaded")
+        tray.showMessage("Buzz Mini", msg, QSystemTrayIcon.MessageIcon.Warning, 8000)
 
     load_thread: Optional[QThread] = None
 
@@ -360,7 +385,7 @@ def main() -> None:
         controller.set_ready(False)
         stop_hotkey_listener()
         hotkey_started = False
-        tray.setToolTip("Buzz Dictate — loading model…")
+        tray.setToolTip("Buzz Mini — loading model…")
         engine.unload()
         engine.set_model_id(settings.selected_model_id())
 
@@ -391,7 +416,7 @@ def main() -> None:
             lt.requestInterruption()
             lt.wait(6000)
         engine.unload()
-        tray.setToolTip("Buzz Dictate — model unloaded (Models… to load again)")
+        tray.setToolTip("Buzz Mini — model unloaded (Models… to load again)")
 
     def graceful_shutdown() -> None:
         nonlocal hotkey_listener, load_thread
@@ -438,26 +463,28 @@ def main() -> None:
     controller.overlay_hide.connect(overlay.hide_overlay)
 
     def on_text(text: str) -> None:
-        overlay.hide_overlay()
         t = (text or "").strip()
         logger.info("Transcription done (%d non-space chars)", len(t))
         if not t:
+            overlay.hide_overlay()
             tray.showMessage(
-                "Buzz Dictate",
+                "Buzz Mini",
                 "Recognition returned empty text. Try another microphone in Settings, "
-                "or set BUZZDICTATE_LANGUAGE (e.g. ru). Text would not be pasted.",
+                "or set BUZZMINI_LANGUAGE (e.g. ru). Text would not be pasted.",
                 QSystemTrayIcon.MessageIcon.Information,
                 6000,
             )
             return
-        _paste_via_clipboard(app, text)
+        # Paste before hiding overlay (same order as Handy) so focus/clipboard settle correctly.
+        _paste_via_clipboard(app, t)
+        overlay.hide_overlay()
 
     def on_err(msg: str) -> None:
         overlay.hide_overlay()
-        tray.showMessage("Buzz Dictate", msg, QSystemTrayIcon.MessageIcon.Warning)
+        tray.showMessage("Buzz Mini", msg, QSystemTrayIcon.MessageIcon.Warning)
 
-    controller.transcribe_done.connect(on_text)
-    controller.transcribe_failed.connect(on_err)
+    controller.transcribe_done.connect(on_text, Qt.ConnectionType.QueuedConnection)
+    controller.transcribe_failed.connect(on_err, Qt.ConnectionType.QueuedConnection)
 
     schedule_load()
 

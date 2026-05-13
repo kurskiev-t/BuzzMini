@@ -10,7 +10,7 @@ from typing import Callable, Optional
 
 from PyQt6.QtCore import QObject, QRunnable, pyqtSignal
 
-from buzz_dictate.models_catalog import ALLOW_PATTERNS, DOWNLOAD_COMPLETE_MARKER
+from buzz_mini.models_catalog import ALLOW_PATTERNS, DOWNLOAD_COMPLETE_MARKER
 
 
 def _snapshot_download_worker(

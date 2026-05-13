@@ -4,7 +4,7 @@ Faster Whisper model catalog + Hugging Face repos (aligned with Buzz `download_f
 Offline / Colab: download a CTranslate2 snapshot elsewhere, copy the folder that contains
 ``model.bin`` (+ ``config.json``, tokenizer, …) onto this PC, then point the app at it::
 
-    set BUZZDICTATE_MODEL=C:\\path\\to\\that\\folder
+    set BUZZMINI_MODEL=C:\\path\\to\\that\\folder
 
 Or set the same path in QSettings via replacing selected model id — ``find_local_snapshot``
 accepts an absolute path to a usable snapshot directory.
@@ -19,7 +19,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
-from buzz_dictate.engine import _resolve_download_root
+from buzz_mini.engine import _resolve_download_root
 
 logger = logging.getLogger(__name__)
 

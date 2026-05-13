@@ -8,12 +8,13 @@ from __future__ import annotations
 import logging
 import os
 import platform
+import sys
 from typing import Optional
 
 import numpy as np
 from platformdirs import user_cache_dir
 
-from buzz_dictate import cuda_setup  # noqa: F401
+from buzz_mini import cuda_setup  # noqa: F401
 
 import faster_whisper
 import torch
@@ -23,16 +24,36 @@ logger = logging.getLogger(__name__)
 WHISPER_SR = 16000
 
 
+def _cuda_major(version: str | None) -> int | None:
+    """Parse major from torch.version.cuda (e.g. '12.6', '12.6+cu126'). None if unknown."""
+    if not version or not str(version).strip():
+        return None
+    base = str(version).split("+", 1)[0].strip()
+    head = base.split(".", 1)[0].strip()
+    if not head.isdigit():
+        return None
+    return int(head)
+
+
 def _resolve_download_root() -> str:
-    """Same faster-whisper cache layout as Buzz (`user_cache_dir('Buzz')/models` + BUZZ_MODEL_ROOT)."""
-    if os.environ.get("BUZZDICTATE_MODEL_ROOT"):
-        return os.environ["BUZZDICTATE_MODEL_ROOT"]
+    """Weights + HF snapshot_download cache directory.
+
+    Priority: BUZZMINI_MODEL_ROOT, BUZZ_MODEL_ROOT, then ``<repo>/models`` when running
+    from a source tree (``pyproject.toml`` next to the ``buzz_mini`` package), else Buzz
+    legacy cache if present, else ``user_cache_dir('BuzzMini')/models``.
+    """
+    if os.environ.get("BUZZMINI_MODEL_ROOT"):
+        return os.environ["BUZZMINI_MODEL_ROOT"]
     if os.environ.get("BUZZ_MODEL_ROOT"):
         return os.environ["BUZZ_MODEL_ROOT"]
+    here = os.path.dirname(os.path.abspath(__file__))
+    parent = os.path.dirname(here)
+    if os.path.isfile(os.path.join(parent, "pyproject.toml")):
+        return os.path.join(parent, "models")
     buzz_models = os.path.join(user_cache_dir("Buzz"), "models")
     if os.path.isdir(buzz_models):
         return buzz_models
-    return os.path.join(user_cache_dir("BuzzDictate"), "models")
+    return os.path.join(user_cache_dir("BuzzMini"), "models")
 
 
 def resample_linear(samples: np.ndarray, orig_sr: int, target_sr: int = WHISPER_SR) -> np.ndarray:
@@ -51,7 +72,7 @@ class WhisperEngine:
 
     def __init__(self, model_size_or_path: Optional[str] = None) -> None:
         self.model_size_or_path = model_size_or_path or os.environ.get(
-            "BUZZDICTATE_MODEL", "large-v3-turbo"
+            "BUZZMINI_MODEL", "large-v3-turbo"
         )
         self._model: faster_whisper.WhisperModel | None = None
 
@@ -74,19 +95,62 @@ class WhisperEngine:
         os.makedirs(model_root_dir, exist_ok=True)
         logger.info("faster-whisper download_root=%s", model_root_dir)
 
-        force_cpu = os.environ.get("BUZZDICTATE_FORCE_CPU", os.environ.get("BUZZ_FORCE_CPU", "false"))
-        device = "auto"
+        force_cpu = os.environ.get("BUZZMINI_FORCE_CPU", os.environ.get("BUZZ_FORCE_CPU", "false"))
+        cuda_ok = torch.cuda.is_available()
         cuda_ver = getattr(torch.version, "cuda", None)
-        if torch.cuda.is_available() and cuda_ver is not None and cuda_ver < "12":
-            logger.debug("CUDA <12 reported — forcing CPU for CTranslate2 compatibility")
+        cuda_major = _cuda_major(cuda_ver if isinstance(cuda_ver, str) else None)
+
+        # Never use string compare on version: e.g. "" < "12" is True in Python and would
+        # incorrectly force CPU while CUDA works (some torch builds report empty cuda string).
+        too_old_cuda = cuda_ok and cuda_major is not None and cuda_major < 12
+
+        device_env = os.environ.get("BUZZMINI_DEVICE", "").strip().lower()
+
+        if device_env == "cpu":
             device = "cpu"
-        if not torch.cuda.is_available():
+        elif device_env == "cuda":
+            device = "cuda" if cuda_ok else "cpu"
+        elif device_env == "auto":
+            device = "auto"
+        elif too_old_cuda:
             device = "cpu"
+            logger.info(
+                "CUDA %s (major %s) < 12 — using CPU for CTranslate2 compatibility",
+                cuda_ver,
+                cuda_major,
+            )
+        elif cuda_ok:
+            # Default when unset: explicit "cuda" (not "auto") — more reliable with CTranslate2 on Windows.
+            device = "cuda"
+        else:
+            device = "cpu"
+
         if force_cpu != "false":
             device = "cpu"
 
+        if device == "cuda" and not cuda_ok:
+            logger.warning("BUZZMINI_DEVICE=cuda but torch.cuda.is_available() is False; using CPU")
+            device = "cpu"
+
+        if device == "auto":
+            device = "cuda" if (cuda_ok and force_cpu == "false" and not too_old_cuda) else "cpu"
+
+        logger.info(
+            "interpreter=%s torch.cuda=%s torch.version.cuda=%r cuda_major=%s -> faster-whisper device=%s",
+            sys.executable,
+            cuda_ok,
+            cuda_ver,
+            cuda_major,
+            device,
+        )
+        if not cuda_ok and force_cpu == "false" and device == "cpu":
+            logger.warning(
+                "CUDA is off in this interpreter — usually CPU-only PyTorch or the wrong "
+                "venv. Try: .venv\\Scripts\\python.exe -m buzz_mini.app"
+            )
+
         reduce_gpu_memory = os.environ.get("BUZZ_REDUCE_GPU_MEMORY", "false") != "false" or os.environ.get(
-            "BUZZDICTATE_REDUCE_VRAM", ""
+            "BUZZMINI_REDUCE_VRAM", ""
         ).lower() in ("1", "true", "yes")
         compute_type = "default"
         if reduce_gpu_memory:
@@ -124,7 +188,7 @@ class WhisperEngine:
             language=lang,
             task="transcribe",
             temperature=temperature,
-            initial_prompt=os.environ.get("BUZZDICTATE_INITIAL_PROMPT", "") or "",
+            initial_prompt=os.environ.get("BUZZMINI_INITIAL_PROMPT", "") or "",
             word_timestamps=False,
             without_timestamps=True,
             no_speech_threshold=0.4,
