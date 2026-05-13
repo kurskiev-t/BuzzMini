@@ -95,19 +95,6 @@ cd BuzzMini
 
 - `BUZZMINI_MODEL_ROOT` — свой каталог для весов и HF-снимков.
 
-### Иконка трея и окна
-
-Нужен **один** файл: **`assets/tray.png`** (та же папка `assets/`, что и `logo.svg`).
-
-- **Формат:** PNG (квадрат 1∶1, по желанию с прозрачным фоном).
-- **Размер:** один экспорт **512×512** или **1024×1024** из Figma — Qt и Windows сами ужмут под размер в трее; меньше **256×256** на мониторах с масштабом может выглядеть мыльно.
-- Без `tray.png` остаётся стандартная иконка Qt.
-- Макет в Figma: [BuzzMini-Icon](https://www.figma.com/design/JNgEEecBLEitmiGdYu2ofq/BuzzMini-Icon?node-id=0-1&t=Fkg9aCeKTQl9dQUk-1).
-
-### Логотип в README
-
-Шапка ссылается на **`assets/logo.svg`**. Тот же файл в Figma: [BuzzMini-Icon](https://www.figma.com/design/JNgEEecBLEitmiGdYu2ofq/BuzzMini-Icon?node-id=0-1&t=Fkg9aCeKTQl9dQUk-1) — фрейм → **Export** → **SVG** → сохраните как `assets/logo.svg` (или другой путь — тогда поправьте тег `<img>` выше).
-
 ### Полезные переменные окружения
 
 | Переменная | Назначение |
