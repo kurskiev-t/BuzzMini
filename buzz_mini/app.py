@@ -12,10 +12,11 @@ import os
 import sys
 import threading
 import time
+from pathlib import Path
 from typing import Optional
 
 from PyQt6.QtCore import QObject, QThread, Qt, pyqtSignal, pyqtSlot
-from PyQt6.QtGui import QAction, QGuiApplication
+from PyQt6.QtGui import QAction, QGuiApplication, QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -35,6 +36,17 @@ from buzz_mini.settings_dialog import SettingsDialog
 from buzz_mini.settings_store import DictateSettings
 
 logger = logging.getLogger(__name__)
+
+
+def _load_tray_icon() -> QIcon | None:
+    """``assets/tray.png`` at repository root, if present."""
+    p = Path(__file__).resolve().parent.parent / "assets" / "tray.png"
+    if not p.is_file():
+        return None
+    pm = QPixmap(str(p))
+    if pm.isNull():
+        return None
+    return QIcon(pm)
 
 
 def _effective_input_device(settings: DictateSettings) -> Optional[int]:
@@ -290,7 +302,12 @@ def main() -> None:
 
     engine = WhisperEngine(model_size_or_path=model_id)
     tray = QSystemTrayIcon(app)
-    tray.setIcon(app.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+    _ico = _load_tray_icon()
+    if _ico is not None:
+        app.setWindowIcon(_ico)
+        tray.setIcon(_ico)
+    else:
+        tray.setIcon(app.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
     tray.setToolTip("Buzz Mini — loading model…")
 
     overlay = RecordingOverlay()
