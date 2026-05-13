@@ -1,6 +1,6 @@
 """
-Qt tray app + global push-to-talk (default: Right Ctrl + Space) + minimal overlay.
-Optional: BUZZMINI_PTT_CHORD=ctrl_r+win for Right Ctrl + Windows.
+Qt tray app + global push-to-talk (default: Left Ctrl + Space) + minimal overlay.
+Optional: BUZZMINI_PTT_CHORD (e.g. ctrl_l+space, ctrl_r+win, ctrl+space like Handy on Windows).
 Paste uses clipboard + modifier+V via pynput (Handy-style: delay after clipboard, VK on Windows).
 BUZZMINI_PASTE_DELAY_MS (default 60) waits for the OS clipboard before sending keys.
 """
