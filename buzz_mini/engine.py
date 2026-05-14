@@ -144,10 +144,22 @@ class WhisperEngine:
             device,
         )
         if not cuda_ok and force_cpu == "false" and device == "cpu":
-            logger.warning(
-                "CUDA is off in this interpreter — usually CPU-only PyTorch or the wrong "
-                "venv. Try: .venv\\Scripts\\python.exe -m buzz_mini.app"
+            hint = (
+                "On Windows, plain `pip install -e .` often installs CPU-only torch from PyPI; "
+                "use `uv sync` or reinstall torch from the PyTorch CUDA index "
+                "(see README: pip install torch --index-url https://download.pytorch.org/whl/cu126)."
             )
+            if sys.platform == "win32":
+                logger.warning(
+                    "CUDA is off in this interpreter (%s) — %s",
+                    sys.executable,
+                    hint,
+                )
+            else:
+                logger.warning(
+                    "CUDA is off in this interpreter (%s) — usually CPU-only PyTorch or wrong venv.",
+                    sys.executable,
+                )
 
         reduce_gpu_memory = os.environ.get("BUZZ_REDUCE_GPU_MEMORY", "false") != "false" or os.environ.get(
             "BUZZMINI_REDUCE_VRAM", ""

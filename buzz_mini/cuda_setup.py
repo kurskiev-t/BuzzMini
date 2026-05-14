@@ -9,6 +9,25 @@ import platform
 import sys
 from pathlib import Path
 
+
+def _get_torch_lib_dirs() -> list[Path]:
+    """Return ``site-packages/torch/lib`` if present (CUDA/cuDNN DLLs ship inside the Windows wheel)."""
+    out: list[Path] = []
+    for path in sys.path:
+        if "site-packages" not in path:
+            continue
+        tl = Path(path) / "torch" / "lib"
+        if not tl.is_dir():
+            continue
+        if sys.platform == "win32":
+            if (tl / "torch.dll").is_file() or (tl / "cudnn64_9.dll").is_file():
+                out.append(tl)
+        else:
+            if any(tl.glob("libcudnn.so*")) or (tl / "libtorch.so").is_file():
+                out.append(tl)
+    return out
+
+
 def _get_nvidia_package_lib_dirs() -> list[Path]:
     lib_dirs: list[Path] = []
     site_packages_dirs: list[Path] = []
@@ -41,8 +60,13 @@ def _get_nvidia_package_lib_dirs() -> list[Path]:
 
 
 def _setup_windows_dll_directories() -> None:
-    lib_dirs = _get_nvidia_package_lib_dirs()
-    for lib_dir in lib_dirs:
+    # PyTorch wheel already ships CUDA/cuDNN in torch\lib; register it before optional nvidia-* wheels.
+    for lib_dir in _get_torch_lib_dirs():
+        try:
+            os.add_dll_directory(str(lib_dir))
+        except (OSError, AttributeError):
+            pass
+    for lib_dir in _get_nvidia_package_lib_dirs():
         try:
             os.add_dll_directory(str(lib_dir))
         except (OSError, AttributeError):
@@ -50,7 +74,7 @@ def _setup_windows_dll_directories() -> None:
 
 
 def _preload_linux_libraries() -> None:
-    lib_dirs = _get_nvidia_package_lib_dirs()
+    lib_dirs = list(_get_torch_lib_dirs()) + _get_nvidia_package_lib_dirs()
     skip_patterns = ["libnvblas"]
     loaded_libs: set[str] = set()
 

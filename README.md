@@ -19,7 +19,7 @@
 
 - **Python 3.12–3.14**
 - Windows / Linux / macOS (GPU на Windows чаще всего через CUDA-сборку PyTorch).
-- Для GPU: драйвер NVIDIA и установленный **CUDA-сборный** `torch` в том окружении, из которого вы запускаете приложение. Системный `python` без CUDA даст работу на **CPU** (медленнее).
+- Для GPU: драйвер NVIDIA и в venv должен стоять **`torch` с CUDA** (не путать с колёсом **CPU-only** с PyPI). Системный `python` или один лишь `pip install -e .` без отдельного шага для Windows часто дают **CPU** `torch` → в логах будет `torch.cuda=False`.
 
 ### Это не «LLM для чата»
 
@@ -58,19 +58,26 @@ uv run buzz-mini
 
 ### Через pip
 
-```bash
-cd BuzzMini
-python -m venv .venv
-.venv\Scripts\activate
-pip install -U pip
-pip install -e .
-```
+**Важно (Windows + NVIDIA):** `pip install -e .` **одной командой** почти всегда ставит **`torch` с PyPI без CUDA** (как у вас: `torch-2.x.x-cp314-win_amd64.whl` с pypi.org → `torch.cuda=False`). Настройки **`[tool.uv.sources]`** в `pyproject.toml` учитывает только **`uv`**, не `pip`.
 
-На **Windows** для GPU обычно нужно ставить PyTorch с CUDA отдельно (индекс совпадает с настройками в `pyproject.toml`, например cu126):
+Варианты:
+
+1. **Рекомендуется:** раздел **«Через uv»** выше — там под Windows подставляется wheel **cu126** автоматически.
+
+2. **Через pip:** сначала CUDA-сборный `torch`, потом проект (или переустановите `torch`, если уже поставили `-e .`):
 
 ```bat
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu126
-pip install -e .
+cd BuzzMini
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -U pip
+.venv\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cu126
+.venv\Scripts\python.exe -m pip install -e .
+```
+
+Если вы уже сделали `pip install -e .` и видите CPU:
+
+```bat
+.venv\Scripts\python.exe -m pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu126
 ```
 
 ### Запуск приложения
