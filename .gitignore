@@ -8,6 +8,3 @@ build/
 *.egg-info/
 .DS_Store
 *.tmp
-
-# Личные заметки автора (не в общий репозиторий)
-project.md
