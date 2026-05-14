@@ -14,6 +14,7 @@ class DictateSettings:
     KEY_MODEL_ID = "selected_model_id"
     KEY_PTT_CHORD = "ptt_chord_id"
     KEY_INPUT_DEVICE = "input_device_index"
+    KEY_CLOSE_TO_TRAY = "close_to_tray_on_window_close"
 
     # Canonical chord ids: left/right Ctrl + Space or Win/Cmd/Super (pynput Key.cmd).
     DEFAULT_PTT_CHORD = "ctrl_l+space"
@@ -73,3 +74,14 @@ class DictateSettings:
 
     def set_input_device_index(self, index: Optional[int]) -> None:
         self._s.setValue(self.KEY_INPUT_DEVICE, -1 if index is None else int(index))
+
+    def close_to_tray_on_window_close(self) -> bool:
+        """When True, closing the main window hides to tray instead of exiting."""
+        v = self._s.value(self.KEY_CLOSE_TO_TRAY, True)
+        if isinstance(v, bool):
+            return v
+        s = str(v).strip().lower() if v is not None else "true"
+        return s not in ("0", "false", "no", "off")
+
+    def set_close_to_tray_on_window_close(self, value: bool) -> None:
+        self._s.setValue(self.KEY_CLOSE_TO_TRAY, bool(value))

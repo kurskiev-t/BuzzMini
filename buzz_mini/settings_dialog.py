@@ -6,12 +6,16 @@ import os
 import sys
 from typing import Optional
 
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
@@ -29,10 +33,13 @@ def _join_chord(mod: str, partner: str) -> str:
     return f"{mod.strip().lower()}+{partner.strip().lower()}"
 
 
-class SettingsDialog(QDialog):
+class SettingsPanel(QWidget):
+    """Settings form for a tab; click **Save settings** to persist."""
+
+    settings_saved = pyqtSignal()
+
     def __init__(self, settings: DictateSettings, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Settings — Buzz Mini")
         self._settings = settings
 
         layout = QVBoxLayout(self)
@@ -94,14 +101,23 @@ class SettingsDialog(QDialog):
 
         layout.addLayout(form)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        self._close_tray = QCheckBox("Close button hides window to tray (Quit in tray menu exits)")
+        self._close_tray.setChecked(settings.close_to_tray_on_window_close())
+        layout.addWidget(self._close_tray)
 
-    def accept(self) -> None:
+        self._save_btn = QPushButton("Save settings")
+        self._save_btn.clicked.connect(self._on_save)
+
+        save_row = QHBoxLayout()
+        save_row.addStretch(1)
+        save_row.addWidget(self._save_btn)
+        layout.addLayout(save_row)
+
+    def _on_save(self) -> None:
+        self.apply()
+        self.settings_saved.emit()
+
+    def apply(self) -> None:
         if self._combo_mod.isEnabled() and self._combo_partner.isEnabled():
             mod = self._combo_mod.currentData()
             partner = self._combo_partner.currentData()
@@ -112,4 +128,26 @@ class SettingsDialog(QDialog):
         if self._combo_mic.isEnabled():
             dev = self._combo_mic.currentData()
             self._settings.set_input_device_index(dev if dev is not None else None)
-        super().accept()
+        self._settings.set_close_to_tray_on_window_close(self._close_tray.isChecked())
+
+
+class SettingsDialog(QDialog):
+    def __init__(self, settings: DictateSettings, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Settings — Buzz Mini")
+        self._panel = SettingsPanel(settings, self)
+        # Hide redundant save button — dialog uses OK
+        self._panel._save_btn.hide()
+        layout = QVBoxLayout(self)
+        layout.addWidget(self._panel)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self._accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _accept(self) -> None:
+        self._panel.apply()
+        self.accept()

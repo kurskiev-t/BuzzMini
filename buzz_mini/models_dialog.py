@@ -1,11 +1,11 @@
-"""Model picker + download / delete / open folder — Buzz Models tab (Faster Whisper only)."""
+"""Model picker + download / delete / open folder (embeddable panel for main window)."""
 
 from __future__ import annotations
 
 import os
 from typing import Iterator, Optional
 
-from PyQt6.QtCore import Qt, QThreadPool
+from PyQt6.QtCore import Qt, QThreadPool, pyqtSignal
 from PyQt6.QtGui import QCloseEvent
 from PyQt6.QtWidgets import (
     QDialog,
@@ -33,7 +33,11 @@ from buzz_mini.models_catalog import (
 from buzz_mini.settings_store import DictateSettings
 
 
-class ModelsDialog(QDialog):
+class ModelsPanel(QWidget):
+    """Models UI for a tab; click **Apply** after changing selection to reload the model."""
+
+    model_apply_requested = pyqtSignal()
+
     def __init__(
         self,
         settings: DictateSettings,
@@ -41,7 +45,6 @@ class ModelsDialog(QDialog):
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Models — Buzz Mini")
         self._settings = settings
         self._download_root = download_root
         self._selected_id = settings.selected_model_id()
@@ -74,23 +77,24 @@ class ModelsDialog(QDialog):
         dl_row.addStretch(1)
         dl_row.addWidget(self._delete_btn)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self._on_accept)
-        buttons.rejected.connect(self.reject)
+        apply_row = QHBoxLayout()
+        self._apply_btn = QPushButton("Apply selection && reload model")
+        self._apply_btn.setDefault(True)
+        self._apply_btn.clicked.connect(self._on_apply)
+        apply_row.addStretch(1)
+        apply_row.addWidget(self._apply_btn)
 
         layout = QVBoxLayout(self)
         layout.addWidget(info)
-        layout.addWidget(self._tree)
+        layout.addWidget(self._tree, 1)
         layout.addLayout(dl_row)
-        layout.addWidget(buttons)
+        layout.addLayout(apply_row)
 
         self._populate_tree()
         self._sync_buttons()
 
     def cancel_download_on_exit(self) -> None:
-        """Stop HF download and close progress UI (app shutdown or dialog closed)."""
+        """Stop HF download and close progress UI (app shutdown)."""
         self._on_download_cancel()
         if self._progress is not None:
             self._progress.close()
@@ -99,6 +103,12 @@ class ModelsDialog(QDialog):
     def closeEvent(self, event: QCloseEvent) -> None:
         self.cancel_download_on_exit()
         super().closeEvent(event)
+
+    def refresh_after_external_model_change(self) -> None:
+        """Call when selected model id may have changed elsewhere."""
+        self._selected_id = self._settings.selected_model_id()
+        self._populate_tree()
+        self._sync_buttons()
 
     def _populate_tree(self) -> None:
         self._tree.clear()
@@ -118,8 +128,6 @@ class ModelsDialog(QDialog):
             item.setData(0, Qt.ItemDataRole.UserRole, entry.model_id)
 
         self._tree.expandToDepth(2)
-
-        # Select current model
         self._select_model_id(self._selected_id)
 
     def _iter_items(self, root: QTreeWidgetItem) -> Iterator[QTreeWidgetItem]:
@@ -157,6 +165,7 @@ class ModelsDialog(QDialog):
             self._download_btn.setEnabled(False)
             self._location_btn.setEnabled(False)
             self._delete_btn.setEnabled(False)
+            self._apply_btn.setEnabled(False)
             return
         installed = find_local_snapshot(mid, self._download_root) is not None
         self._download_btn.setVisible(not installed)
@@ -165,6 +174,7 @@ class ModelsDialog(QDialog):
         self._location_btn.setEnabled(installed)
         self._delete_btn.setVisible(installed)
         self._delete_btn.setEnabled(installed)
+        self._apply_btn.setEnabled(True)
 
     def _on_download(self) -> None:
         mid = self._current_model_id()
@@ -172,7 +182,7 @@ class ModelsDialog(QDialog):
             return
         os.makedirs(self._download_root, exist_ok=True)
 
-        self._progress = ModelDownloadProgressDialog(self)
+        self._progress = ModelDownloadProgressDialog(self.window() or self)
         self._progress.canceled.connect(self._on_download_cancel)
 
         self._download_btn.setEnabled(False)
@@ -203,7 +213,7 @@ class ModelsDialog(QDialog):
             self._progress = None
         self._current_task = None
         self._download_btn.setEnabled(True)
-        QMessageBox.warning(self, "Buzz Mini", f"Download failed:\n{msg}")
+        QMessageBox.warning(self.window() or self, "Buzz Mini", f"Download failed:\n{msg}")
         self._populate_tree()
         self._sync_buttons()
 
@@ -218,7 +228,7 @@ class ModelsDialog(QDialog):
             return
         title = title_for_id(mid)
         reply = QMessageBox.question(
-            self,
+            self.window() or self,
             "Delete model",
             f"Remove “{title}” from the Hugging Face cache on disk?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -230,17 +240,40 @@ class ModelsDialog(QDialog):
         self._populate_tree()
         self._sync_buttons()
 
-    def _on_accept(self) -> None:
+    def _on_apply(self) -> None:
         mid = self._current_model_id()
         if not mid:
-            QMessageBox.information(self, "Buzz Mini", "Select a model.")
+            QMessageBox.information(self.window() or self, "Buzz Mini", "Select a model.")
             return
         if find_local_snapshot(mid, self._download_root) is None:
             QMessageBox.information(
-                self,
+                self.window() or self,
                 "Buzz Mini",
                 f"“{title_for_id(mid)}” is not downloaded yet.\nUse Download first.",
             )
             return
         self._settings.set_selected_model_id(mid)
-        self.accept()
+        self.model_apply_requested.emit()
+
+
+class ModelsDialog(QDialog):
+    """Legacy modal dialog; kept for tests or external callers."""
+
+    def __init__(
+        self,
+        settings: DictateSettings,
+        download_root: str,
+        parent: Optional[QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Models — Buzz Mini")
+        self._panel = ModelsPanel(settings, download_root, self)
+        self._panel.model_apply_requested.connect(self.accept)
+        lay = QVBoxLayout(self)
+        lay.addWidget(self._panel)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
+        buttons.rejected.connect(self.reject)
+        lay.addWidget(buttons)
+
+    def cancel_download_on_exit(self) -> None:
+        self._panel.cancel_download_on_exit()

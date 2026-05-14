@@ -1,4 +1,4 @@
-"""Donation dialog: VTB Paymo link and QR; Donatty planned when verified."""
+"""Donation: VTB Paymo link and QR; Donatty planned when verified."""
 
 from __future__ import annotations
 
@@ -29,13 +29,9 @@ def _donate_qr_path() -> Path:
     return Path(__file__).resolve().parent.parent / "assets" / "donate-qr.png"
 
 
-class DonateDialog(QDialog):
+class DonatePanel(QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("О донате")
-        self.setModal(True)
-        self.setMinimumWidth(440)
-
         url = os.environ.get("BUZZMINI_DONATE_URL", _DEFAULT_DONATE_URL).strip() or _DEFAULT_DONATE_URL
 
         layout = QVBoxLayout(self)
@@ -80,7 +76,17 @@ class DonateDialog(QDialog):
         btn_row.addWidget(donate_btn)
         btn_row.addStretch(1)
         layout.addLayout(btn_row)
+        layout.addStretch(1)
 
+
+class DonateDialog(QDialog):
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("О донате")
+        self.setModal(True)
+        self.setMinimumWidth(440)
+        layout = QVBoxLayout(self)
+        layout.addWidget(DonatePanel(self))
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)

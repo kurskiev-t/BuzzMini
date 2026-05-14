@@ -19,20 +19,17 @@ from PyQt6.QtCore import QObject, QThread, Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QAction, QGuiApplication, QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
-    QDialog,
     QMenu,
     QStyle,
     QSystemTrayIcon,
 )
 
 from buzz_mini.audio_ptt import PTTCapture
-from buzz_mini.donate_dialog import DonateDialog
 from buzz_mini.engine import WhisperEngine, _resolve_download_root
+from buzz_mini.main_window import BuzzMainWindow, MainTab
 from buzz_mini.models_catalog import find_local_snapshot, title_for_id
-from buzz_mini.models_dialog import ModelsDialog
 from buzz_mini.overlay import RecordingOverlay
 from buzz_mini.ptt_chord import effective_ptt_chord_raw, parse_ptt_chord_raw
-from buzz_mini.settings_dialog import SettingsDialog
 from buzz_mini.settings_store import DictateSettings
 
 logger = logging.getLogger(__name__)
@@ -107,7 +104,7 @@ class LoadWorker(QObject):
             if find_local_snapshot(mid, self._download_root) is None:
                 if not th.isInterruptionRequested():
                     self.failed.emit(
-                        "Model is not downloaded yet.\nUse tray → Models… → Download."
+                        "Model is not downloaded yet.\nOpen Buzz Mini → Models tab → Download."
                     )
                 return
             if th.isInterruptionRequested():
@@ -318,16 +315,21 @@ def main() -> None:
     hotkey_started = False
 
     _ctrl_ptt, _partner_ptt, ptt_chord_label = parse_ptt_chord_raw(effective_ptt_chord_raw(settings))
-    logger.info("Push-to-talk: %s (Tray → Settings, or BUZZMINI_PTT_CHORD)", ptt_chord_label)
+    logger.info("Push-to-talk: %s (Tray → Settings tab, or BUZZMINI_PTT_CHORD)", ptt_chord_label)
 
     menu = QMenu()
-    models_action = QAction("Models…")
+    open_action = QAction("Open Buzz Mini")
+    models_action = QAction("Models")
     settings_action = QAction("Settings")
+    logs_action = QAction("Logs")
     unload_action = QAction("Unload model")
     donate_action = QAction("Donate — Донат")
     quit_action = QAction("Quit")
+    menu.addAction(open_action)
     menu.addAction(models_action)
     menu.addAction(settings_action)
+    menu.addAction(logs_action)
+    menu.addSeparator()
     menu.addAction(unload_action)
     menu.addSeparator()
     menu.addAction(donate_action)
@@ -335,6 +337,23 @@ def main() -> None:
     menu.addAction(quit_action)
     tray.setContextMenu(menu)
     tray.show()
+
+    main_win = BuzzMainWindow(settings, download_root)
+    main_win.hide()
+
+    def _show_main(tab: MainTab | None = None) -> None:
+        if tab is not None:
+            main_win.show_tab(tab)
+        else:
+            main_win.show()
+            main_win.raise_()
+            main_win.activateWindow()
+
+    def on_tray_activated(reason: QSystemTrayIcon.ActivationReason) -> None:
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            _show_main(MainTab.MODELS)
+
+    tray.activated.connect(on_tray_activated)
 
     def refresh_ptt_chord_from_settings() -> None:
         nonlocal _ctrl_ptt, _partner_ptt, ptt_chord_label
@@ -370,6 +389,7 @@ def main() -> None:
         first = not hotkey_started
         hotkey_started = True
         attach_hotkey_listener()
+        main_win.models_panel().refresh_after_external_model_change()
         if first:
             tray.showMessage(
                 "Buzz Mini",
@@ -437,14 +457,37 @@ def main() -> None:
             lt.requestInterruption()
             lt.wait(6000)
         engine.unload()
-        tray.setToolTip("Buzz Mini — model unloaded (Models… to load again)")
+        tray.setToolTip("Buzz Mini — model unloaded (Models tab → Apply to load again)")
+        main_win.models_panel().refresh_after_external_model_change()
+
+    main_win.models_panel().model_apply_requested.connect(schedule_load)
+
+    def on_settings_saved() -> None:
+        refresh_ptt_chord_from_settings()
+        controller.refresh_input_device()
+        if controller.is_ready():
+            attach_hotkey_listener()
+            update_tooltip_ready()
+
+    main_win.settings_panel().settings_saved.connect(on_settings_saved)
+
+    open_action.triggered.connect(lambda: _show_main(None))
+    models_action.triggered.connect(lambda: _show_main(MainTab.MODELS))
+    settings_action.triggered.connect(lambda: _show_main(MainTab.SETTINGS))
+    logs_action.triggered.connect(lambda: _show_main(MainTab.LOGS))
+    donate_action.triggered.connect(lambda: _show_main(MainTab.DONATE))
+    unload_action.triggered.connect(unload_model)
+
+    def request_quit() -> None:
+        main_win._force_quit = True
+        app.quit()
+
+    quit_action.triggered.connect(request_quit)
 
     def graceful_shutdown() -> None:
         nonlocal hotkey_listener, load_thread
         logger.info("Exiting: stopping listener, capture, downloads, load worker…")
-        for w in app.topLevelWidgets():
-            if isinstance(w, ModelsDialog):
-                w.cancel_download_on_exit()
+        main_win.prepare_shutdown()
         stop_hotkey_listener()
         controller.shutdown()
         overlay.hide_overlay()
@@ -455,29 +498,6 @@ def main() -> None:
                 logger.warning("Load thread did not finish in time")
         engine.unload()
 
-    def open_models() -> None:
-        dlg = ModelsDialog(settings, download_root)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
-            schedule_load()
-
-    def open_settings() -> None:
-        dlg = SettingsDialog(settings)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
-            refresh_ptt_chord_from_settings()
-            controller.refresh_input_device()
-            if controller.is_ready():
-                attach_hotkey_listener()
-                update_tooltip_ready()
-
-    def open_donate() -> None:
-        dlg = DonateDialog()
-        dlg.exec()
-
-    models_action.triggered.connect(open_models)
-    settings_action.triggered.connect(open_settings)
-    unload_action.triggered.connect(unload_model)
-    donate_action.triggered.connect(open_donate)
-    quit_action.triggered.connect(app.quit)
     app.aboutToQuit.connect(graceful_shutdown)
 
     # --- Wiring (before schedule_load so a fast cached load cannot emit PTT before slots exist)
