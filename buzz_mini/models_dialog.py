@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Iterator, Optional
 
@@ -31,6 +32,8 @@ from buzz_mini.models_catalog import (
     title_for_id,
 )
 from buzz_mini.settings_store import DictateSettings
+
+logger = logging.getLogger(__name__)
 
 
 class ModelsPanel(QWidget):
@@ -97,6 +100,7 @@ class ModelsPanel(QWidget):
         """Stop HF download and close progress UI (app shutdown)."""
         self._on_download_cancel()
         if self._progress is not None:
+            self._progress.disconnect_cancel(self._on_download_cancel)
             self._progress.close()
             self._progress = None
 
@@ -191,29 +195,49 @@ class ModelsPanel(QWidget):
         self._current_task = task
         task.signals.finished.connect(lambda _p: self._on_download_finished())
         task.signals.error.connect(self._on_download_error)
+        task.signals.progress.connect(self._progress.set_detail_text)
+        task.signals.aborted.connect(self._on_download_aborted)
         self._pool.start(task)
         self._progress.show()
+
+    def _close_progress_safely(self) -> None:
+        if self._progress is not None:
+            self._progress.disconnect_cancel(self._on_download_cancel)
+            self._progress.close()
+            self._progress = None
 
     def _on_download_cancel(self) -> None:
         if self._current_task:
             self._current_task.cancel()
 
     def _on_download_finished(self) -> None:
-        if self._progress:
-            self._progress.close()
-            self._progress = None
+        self._close_progress_safely()
+        self._current_task = None
+        self._download_btn.setEnabled(True)
+        self._populate_tree()
+        self._sync_buttons()
+
+    def _on_download_aborted(self) -> None:
+        logger.info("Model download canceled by user")
+        self._close_progress_safely()
         self._current_task = None
         self._download_btn.setEnabled(True)
         self._populate_tree()
         self._sync_buttons()
 
     def _on_download_error(self, msg: str) -> None:
-        if self._progress:
-            self._progress.close()
-            self._progress = None
         self._current_task = None
         self._download_btn.setEnabled(True)
-        QMessageBox.warning(self.window() or self, "Buzz Mini", f"Download failed:\n{msg}")
+        if self._progress is not None:
+            dlg = self._progress
+
+            def cleanup(_unused: int) -> None:
+                dlg.finished.disconnect(cleanup)
+                if self._progress is dlg:
+                    self._progress = None
+
+            dlg.finished.connect(cleanup)
+            dlg.show_error(msg)
         self._populate_tree()
         self._sync_buttons()
 

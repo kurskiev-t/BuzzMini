@@ -8,6 +8,7 @@ BUZZMINI_PASTE_DELAY_MS (default 60) waits for the OS clipboard before sending k
 from __future__ import annotations
 
 import logging
+import multiprocessing
 import os
 import sys
 import threading
@@ -282,6 +283,9 @@ def _start_hotkey_listener(bridge: HotkeyBridge, ctrl_key: object, partner_key: 
 
 
 def main() -> None:
+    # Required when using multiprocessing inside a frozen (PyInstaller) Windows build.
+    multiprocessing.freeze_support()
+
     logging.basicConfig(
         level=os.environ.get("BUZZMINI_LOG_LEVEL", "INFO"),
         format="%(levelname)s %(name)s: %(message)s",
