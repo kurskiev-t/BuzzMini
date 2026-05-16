@@ -8,3 +8,9 @@ build/
 *.egg-info/
 .DS_Store
 *.tmp
+*.zip.tmp
+
+# Локальные заметки автора и вспомогательные скрипты (не в публичный репозиторий)
+project.md
+assets/APP_ICON.md
+tools/gen_placeholder_app_ico.py

@@ -12,7 +12,6 @@ import os
 import sys
 import threading
 import time
-from pathlib import Path
 from typing import Optional
 
 from PyQt6.QtCore import QObject, QThread, Qt, pyqtSignal, pyqtSlot
@@ -26,6 +25,7 @@ from PyQt6.QtWidgets import (
 
 from buzz_mini.audio_ptt import PTTCapture
 from buzz_mini.engine import WhisperEngine, _resolve_download_root
+from buzz_mini.paths import assets_dir
 from buzz_mini.main_window import BuzzMainWindow, MainTab
 from buzz_mini.models_catalog import find_local_snapshot, title_for_id
 from buzz_mini.overlay import RecordingOverlay
@@ -36,8 +36,8 @@ logger = logging.getLogger(__name__)
 
 
 def _load_tray_icon() -> QIcon | None:
-    """``assets/tray.png`` at repository root, if present."""
-    p = Path(__file__).resolve().parent.parent / "assets" / "tray.png"
+    """``assets/tray.png`` next to the repo (dev) or inside the bundle (frozen)."""
+    p = assets_dir() / "tray.png"
     if not p.is_file():
         return None
     pm = QPixmap(str(p))

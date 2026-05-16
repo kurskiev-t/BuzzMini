@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from buzz_mini.paths import assets_dir
+
 from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtGui import QDesktopServices, QPixmap
 from PyQt6.QtWidgets import (
@@ -26,7 +28,7 @@ _DEFAULT_DONATE_URL = (
 
 
 def _donate_qr_path() -> Path:
-    return Path(__file__).resolve().parent.parent / "assets" / "donate-qr.png"
+    return assets_dir() / "donate-qr.png"
 
 
 class DonatePanel(QWidget):
