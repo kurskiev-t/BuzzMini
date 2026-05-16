@@ -1,0 +1,5 @@
+{
+  "repository": "kurskiev-t/BuzzMini",
+  "tagTemplate": "{version}",
+  "assetTemplate": "BuzzMini-{version}-win64.7z"
+}

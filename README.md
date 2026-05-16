@@ -98,6 +98,27 @@ cd BuzzMini
 
 В репозитории: **`BuzzMini.spec`** и **`tools/build_windows.ps1`**. Нужен тот же **`.venv`** с **CUDA PyTorch**, что и для обычного запуска; в `pyproject.toml` — optional extra **`win-build`**. Итог: каталог **`dist/BuzzMini/`** с **`BuzzMini.exe`** (порядка нескольких ГБ вместе с зависимостями).
 
+### Установщик Windows (NSIS, web-installer)
+
+Два артефакта на [GitHub Release](https://github.com/kurskiev-t/BuzzMini/releases):
+
+| Файл | Как собрать | Назначение |
+|------|-------------|------------|
+| **`BuzzMini-<версия>-win64.7z`** | **`.\tools\build_release_payload.ps1`** | PyInstaller onedir (~ГБ), качается при установке |
+| **`BuzzMini-Setup-<версия>.exe`** | **`.\tools\build_installer.ps1`** | Маленький установщик (качает `.7z` с GitHub) |
+
+**Порядок для релиза:**
+
+1. **`.\tools\build_windows.ps1`** → **`dist\BuzzMini\`**
+2. Установить [7-Zip](https://www.7-zip.org/) (для шага 3) и [NSIS](https://nsis.sourceforge.io/) (`winget install NSIS.NSIS`)
+3. **`.\tools\build_release_payload.ps1`** → **`dist\BuzzMini-1.0.0-win64.7z`** (имя из **`installer\release.json`**)
+4. Создать GitHub Release с тегом **`1.0.0`** (как у [0.1.0](https://github.com/kurskiev-t/BuzzMini/releases/tag/0.1.0), без префикса `v`), прикрепить **`.7z`**
+5. **`.\tools\build_installer.ps1`** → **`dist\BuzzMini-Setup-1.0.0.exe`**, прикрепить к тому же Release
+
+При установке в окне «Installing» (кнопка **Show details**) видно URL GitHub, прогресс загрузки и распаковку. **Веса Whisper** по-прежнему качаются **при первом запуске** из вкладки **Models**, не установщиком.
+
+Конфиг URL: **`installer\release.json`** (`repository`, `tagTemplate`, `assetTemplate`). Переопределение: **`-PayloadUrl`**, **`-GithubRepo`**, **`-ProductVersion`** у `build_installer.ps1`.
+
 ### Где лежат модели
 
 По умолчанию при запуске **из исходников** кэш моделей — папка **`models`** в корне репозитория (рядом с `pyproject.toml`). Иначе используется пользовательский кэш приложения и совместимость с каталогом Buzz.

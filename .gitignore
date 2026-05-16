@@ -5,6 +5,7 @@ __pycache__/
 .pytest_cache/
 dist/
 build/
+installer/redist/
 *.egg-info/
 .DS_Store
 *.tmp
