@@ -4,7 +4,7 @@
 ; Upload payload first: .\tools\build_release_payload.ps1  ->  attach .7z to GitHub Release
 ;
 ; Manual:
-;   makensis /DOUTFILE=dist\BuzzMini-Setup-1.0.0.exe /DPRODUCT_VERSION=1.0.0 /DPAYLOAD_URL=https://github.com/.../BuzzMini-1.0.0-win64.7z installer\BuzzMini.nsi
+;   makensis /DOUTFILE=dist\BuzzMini-Setup-1.0.1.exe /DPRODUCT_VERSION=1.0.1 /DPAYLOAD_URL=https://github.com/.../BuzzMini-1.0.1-win64.7z installer\BuzzMini.nsi
 
 Unicode true
 CRCCheck force
@@ -13,7 +13,7 @@ SetCompressorDictSize 32
 InstallDir "$PROGRAMFILES64\Buzz Mini"
 
 !ifndef PRODUCT_VERSION
-  !define PRODUCT_VERSION "1.0.0"
+  !define PRODUCT_VERSION "1.0.1"
 !endif
 
 !ifndef PAYLOAD_URL

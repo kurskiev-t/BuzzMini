@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 )
 
 from buzz_mini.audio_devices import input_devices_for_ui
+from buzz_mini.engine import transcription_device_summary
 from buzz_mini.settings_store import DictateSettings
 
 
@@ -43,6 +44,14 @@ class SettingsPanel(QWidget):
         self._settings = settings
 
         layout = QVBoxLayout(self)
+
+        device_label, device_warn = transcription_device_summary()
+        device_text = f"Transcription device: {device_label}"
+        if device_warn:
+            device_text += f"\n{device_warn}"
+        self._device_info = QLabel(device_text)
+        self._device_info.setWordWrap(True)
+        layout.addWidget(self._device_info)
 
         env_ptt = os.environ.get("BUZZMINI_PTT_CHORD", "").strip()
         if env_ptt:

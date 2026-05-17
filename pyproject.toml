@@ -1,6 +1,6 @@
 [project]
 name = "buzz-mini"
-version = "1.0.0"
+version = "1.0.1"
 description = "BuzzMini — minimal local GPU dictation (push-to-talk), spun out from Buzz ideas"
 requires-python = ">=3.12,<3.15"
 dependencies = [

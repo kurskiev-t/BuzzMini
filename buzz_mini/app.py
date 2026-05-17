@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import (
 )
 
 from buzz_mini.audio_ptt import PTTCapture
-from buzz_mini.engine import WhisperEngine, _resolve_download_root
+from buzz_mini.engine import WhisperEngine, _resolve_download_root, transcription_device_summary
 from buzz_mini.paths import assets_dir
 from buzz_mini.main_window import BuzzMainWindow, MainTab
 from buzz_mini.models_catalog import find_local_snapshot, title_for_id
@@ -477,6 +477,14 @@ def main() -> None:
                 QSystemTrayIcon.MessageIcon.Information,
                 3500,
             )
+            _, device_warn = transcription_device_summary()
+            if device_warn:
+                tray.showMessage(
+                    "Buzz Mini — CPU mode",
+                    device_warn,
+                    QSystemTrayIcon.MessageIcon.Warning,
+                    10000,
+                )
 
     def on_load_failed(msg: str) -> None:
         nonlocal hotkey_started

@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import os
 import platform
+import subprocess
 import sys
 from typing import Optional
 
@@ -22,6 +23,115 @@ import torch
 logger = logging.getLogger(__name__)
 
 WHISPER_SR = 16000
+
+
+def _cuda_build_available(cuda_ver: object) -> bool:
+    if not isinstance(cuda_ver, str):
+        return False
+    return bool(cuda_ver.strip())
+
+
+def _win32_video_adapter_names() -> list[str]:
+    """Win32_VideoController names via PowerShell/CIM (Windows only)."""
+    if sys.platform != "win32":
+        return []
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    try:
+        proc = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Get-CimInstance Win32_VideoController | ForEach-Object { $_.Name }",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            creationflags=creationflags,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    if proc.returncode != 0:
+        return []
+    return [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+
+
+def _adapter_blob(names: list[str]) -> str:
+    return " ".join(names).lower()
+
+
+def _has_nvidia_adapter(names: list[str]) -> bool:
+    blob = _adapter_blob(names)
+    return any(tok in blob for tok in ("nvidia", "geforce", "quadro", "rtx ", "gtx"))
+
+
+def _has_amd_adapter(names: list[str]) -> bool:
+    blob = _adapter_blob(names)
+    return any(tok in blob for tok in ("amd", "radeon", "rx "))
+
+
+def cuda_unavailable_reason(*, cuda_ok: bool, cuda_ver: object) -> str | None:
+    """Human-readable reason when transcription will use CPU instead of CUDA."""
+    if cuda_ok:
+        return None
+    if not _cuda_build_available(cuda_ver):
+        if sys.platform == "win32":
+            return (
+                "This install uses CPU-only PyTorch (no CUDA). "
+                "Developer builds need CUDA torch (uv sync or PyTorch cu126 index); "
+                "end users need the Buzz Mini release with NVIDIA GPU support."
+            )
+        return "This install uses CPU-only PyTorch (no CUDA)."
+
+    names = _win32_video_adapter_names()
+    if _has_nvidia_adapter(names):
+        return (
+            "NVIDIA GPU detected but CUDA is not available — update the NVIDIA driver "
+            "or reinstall Buzz Mini from the CUDA release build."
+        )
+    if _has_amd_adapter(names):
+        return (
+            "AMD GPU detected — Buzz Mini uses NVIDIA CUDA only; transcription runs on CPU. "
+            "For speed, pick a smaller model (e.g. Small or Base) on the Models tab."
+        )
+    return (
+        "No NVIDIA CUDA device is available; transcription runs on CPU. "
+        "GPU acceleration requires an NVIDIA GPU and driver."
+    )
+
+
+def transcription_device_summary() -> tuple[str, str | None]:
+    """Short UI label and optional warning (Settings, tray)."""
+    cuda_ok = torch.cuda.is_available()
+    cuda_ver = getattr(torch.version, "cuda", None)
+    if cuda_ok:
+        try:
+            gpu_name = torch.cuda.get_device_name(0)
+        except Exception:
+            gpu_name = "CUDA"
+        return f"GPU (CUDA): {gpu_name}", None
+    return "CPU", cuda_unavailable_reason(cuda_ok=False, cuda_ver=cuda_ver)
+
+
+def _log_cuda_unavailable(cuda_ver: object) -> None:
+    if _cuda_build_available(cuda_ver):
+        detail = cuda_unavailable_reason(cuda_ok=False, cuda_ver=cuda_ver)
+        logger.warning("CUDA is off — %s", detail)
+        return
+    if sys.platform == "win32":
+        logger.warning(
+            "CUDA is off — CPU-only PyTorch in %s. On Windows, plain `pip install -e .` "
+            "often installs CPU torch from PyPI; use `uv sync` or reinstall torch from the "
+            "PyTorch CUDA index (README: pip install torch --index-url "
+            "https://download.pytorch.org/whl/cu126).",
+            sys.executable,
+        )
+    else:
+        logger.warning(
+            "CUDA is off — CPU-only PyTorch in %s (usually wrong venv or CPU wheel).",
+            sys.executable,
+        )
 
 
 def _cuda_major(version: str | None) -> int | None:
@@ -144,22 +254,7 @@ class WhisperEngine:
             device,
         )
         if not cuda_ok and force_cpu == "false" and device == "cpu":
-            hint = (
-                "On Windows, plain `pip install -e .` often installs CPU-only torch from PyPI; "
-                "use `uv sync` or reinstall torch from the PyTorch CUDA index "
-                "(see README: pip install torch --index-url https://download.pytorch.org/whl/cu126)."
-            )
-            if sys.platform == "win32":
-                logger.warning(
-                    "CUDA is off in this interpreter (%s) — %s",
-                    sys.executable,
-                    hint,
-                )
-            else:
-                logger.warning(
-                    "CUDA is off in this interpreter (%s) — usually CPU-only PyTorch or wrong venv.",
-                    sys.executable,
-                )
+            _log_cuda_unavailable(cuda_ver)
 
         reduce_gpu_memory = os.environ.get("BUZZ_REDUCE_GPU_MEMORY", "false") != "false" or os.environ.get(
             "BUZZMINI_REDUCE_VRAM", ""
