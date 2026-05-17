@@ -15,7 +15,7 @@ import threading
 import time
 from typing import Optional
 
-from PyQt6.QtCore import QObject, QThread, Qt, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import QObject, QThread, Qt, QTimer, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QAction, QGuiApplication, QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
@@ -63,19 +63,82 @@ def _parse_language() -> Optional[str]:
     return lang or None
 
 
+def _key_vk(event: object) -> int | None:
+    try:
+        vk = getattr(event, "vk", None)
+        if vk is not None:
+            return int(vk)
+    except (TypeError, ValueError):
+        pass
+    return None
+
+
 def _key_match(event: object, target: object) -> bool:
     """True if pynput key event matches target (handles vk quirks on Windows)."""
     if event is None:
         return False
     if event == target:
         return True
-    try:
-        vk_e = getattr(event, "vk", None)
-        vk_t = getattr(target, "vk", None)
-        if vk_e is not None and vk_t is not None and vk_e == vk_t:
-            return True
-    except Exception:
-        pass
+    vk_e = _key_vk(event)
+    vk_t = _key_vk(target)
+    if vk_e is not None and vk_t is not None and vk_e == vk_t:
+        return True
+    return False
+
+
+def _modifier_match(event: object, mod_key: object) -> bool:
+    """Chord modifier: on Windows distinguish left vs right Ctrl by VK."""
+    from pynput.keyboard import Key
+
+    vk = _key_vk(event)
+    if sys.platform == "win32" and vk is not None:
+        if mod_key == Key.ctrl_l:
+            return vk == 0xA2
+        if mod_key == Key.ctrl_r:
+            return vk == 0xA3
+    return _key_match(event, mod_key)
+
+
+def _partner_match(event: object, partner_key: object) -> bool:
+    from pynput.keyboard import Key
+
+    vk = _key_vk(event)
+    if sys.platform == "win32" and vk is not None:
+        if partner_key == Key.space:
+            return vk == 0x20
+        if partner_key == Key.cmd:
+            return vk in (0x5B, 0x5C)
+    return _key_match(event, partner_key)
+
+
+def _physical_key_down(vk: int) -> bool:
+    if sys.platform != "win32":
+        return False
+    import ctypes
+
+    return bool(ctypes.windll.user32.GetAsyncKeyState(vk) & 0x8000)
+
+
+def _physical_ctrl_down(mod_key: object) -> bool:
+    from pynput.keyboard import Key
+
+    if sys.platform == "win32":
+        if mod_key == Key.ctrl_l:
+            return _physical_key_down(0xA2)
+        if mod_key == Key.ctrl_r:
+            return _physical_key_down(0xA3)
+        return _physical_key_down(0x11)
+    return False
+
+
+def _physical_partner_down(partner_key: object) -> bool:
+    from pynput.keyboard import Key
+
+    if sys.platform == "win32":
+        if partner_key == Key.space:
+            return _physical_key_down(0x20)
+        if partner_key == Key.cmd:
+            return _physical_key_down(0x5B) or _physical_key_down(0x5C)
     return False
 
 
@@ -249,30 +312,43 @@ def _paste_via_clipboard(app: QApplication, text: str) -> None:
 
 
 def _start_hotkey_listener(bridge: HotkeyBridge, ctrl_key: object, partner_key: object) -> object:
-    """Start global chord listener (both keys down = PTT). Return listener (call `.stop()` before exit)."""
+    """Start global chord listener (partner pressed while Ctrl held = PTT)."""
     from pynput import keyboard
 
     ctrl_down = False
     partner_down = False
     chord_active = False
 
+    def _ctrl_held() -> bool:
+        if sys.platform == "win32":
+            return _physical_ctrl_down(ctrl_key)
+        return ctrl_down
+
+    def _chord_keys_held() -> bool:
+        if sys.platform == "win32":
+            return _physical_ctrl_down(ctrl_key) and _physical_partner_down(partner_key)
+        return ctrl_down and partner_down
+
     def on_press(key: keyboard.Key | keyboard.KeyCode | None) -> None:
         nonlocal ctrl_down, partner_down, chord_active
-        if _key_match(key, ctrl_key):
+        if _modifier_match(key, ctrl_key):
             ctrl_down = True
-        if _key_match(key, partner_key):
+            return
+        if _partner_match(key, partner_key):
             partner_down = True
-        if ctrl_down and partner_down and not chord_active:
-            chord_active = True
-            bridge.ptt_down.emit()
+            # Activate only on partner press while Ctrl is held (not Ctrl+A / Ctrl+C shortcuts).
+            if _ctrl_held() and not chord_active:
+                chord_active = True
+                bridge.ptt_down.emit()
+            return
 
     def on_release(key: keyboard.Key | keyboard.KeyCode | None) -> None:
         nonlocal ctrl_down, partner_down, chord_active
-        if _key_match(key, ctrl_key):
+        if _modifier_match(key, ctrl_key):
             ctrl_down = False
-        if _key_match(key, partner_key):
+        if _partner_match(key, partner_key):
             partner_down = False
-        if chord_active and not (ctrl_down and partner_down):
+        if chord_active and not _chord_keys_held():
             chord_active = False
             bridge.ptt_up.emit()
 
@@ -503,6 +579,24 @@ def main() -> None:
         engine.unload()
 
     app.aboutToQuit.connect(graceful_shutdown)
+
+    # After lock/sleep, pynput often misses key releases; restart listener when session is active again.
+    ptt_listener_refresh = QTimer(app)
+    ptt_listener_refresh.setSingleShot(True)
+    ptt_listener_refresh.setInterval(400)
+
+    def refresh_hotkey_listener_debounced() -> None:
+        if controller.is_ready():
+            logger.info("App/session active — refresh push-to-talk listener")
+            attach_hotkey_listener()
+
+    ptt_listener_refresh.timeout.connect(refresh_hotkey_listener_debounced)
+
+    def on_application_state_changed(state: Qt.ApplicationState) -> None:
+        if state == Qt.ApplicationState.ApplicationActive and controller.is_ready():
+            ptt_listener_refresh.start()
+
+    app.applicationStateChanged.connect(on_application_state_changed)
 
     # --- Wiring (before schedule_load so a fast cached load cannot emit PTT before slots exist)
     bridge.ptt_down.connect(controller.on_ptt_down)

@@ -1,4 +1,4 @@
-; Buzz Mini — small NSIS bootstrapper (downloads PyInstaller bundle from GitHub Releases).
+; Buzz Mini - small NSIS bootstrapper (downloads PyInstaller bundle from GitHub Releases).
 ;
 ; Build: .\tools\build_installer.ps1
 ; Upload payload first: .\tools\build_release_payload.ps1  ->  attach .7z to GitHub Release
@@ -29,6 +29,10 @@ InstallDir "$PROGRAMFILES64\Buzz Mini"
 !define UNINSTALL_EXE_NAME "BuzzMini-Uninstall.exe"
 !define UNINSTALL_REG_SUBKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\BuzzMini"
 !define PAYLOAD_ARCHIVE_NAME "BuzzMini-payload.7z"
+; Shown on directory page (NSIS cannot know GitHub asset size until download).
+!ifndef ESTIMATED_INSTALL_KB
+  !define ESTIMATED_INSTALL_KB 4500000
+!endif
 
 Name "${PRODUCT_NAME}"
 Caption "${PRODUCT_NAME} ${PRODUCT_VERSION} Setup"
@@ -55,6 +59,8 @@ RequestExecutionLevel admin
 
 !define MUI_ABORTWARNING_TEXT "Cancel setup?"
 
+!define MUI_DIRECTORYPAGE_TEXT_TOP "Setup downloads the application bundle from GitHub during installation (about 4+ GB after extract).$\r$\nEnsure you have enough free disk space and a stable internet connection."
+
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 
@@ -62,7 +68,7 @@ Section "!${PRODUCT_NAME} (required)" SID_MAIN
   SectionIn RO
 
   DetailPrint "========================================"
-  DetailPrint "${PRODUCT_NAME} ${PRODUCT_VERSION} — online setup"
+  DetailPrint "${PRODUCT_NAME} ${PRODUCT_VERSION} - online setup"
   DetailPrint "Install folder: $INSTDIR"
   DetailPrint "========================================"
 
@@ -78,17 +84,33 @@ Section "!${PRODUCT_NAME} (required)" SID_MAIN
   DetailPrint ""
   DetailPrint "Downloading application bundle from GitHub:"
   DetailPrint "${PAYLOAD_URL}"
-  DetailPrint "(PyInstaller onedir: Python, Qt, PyTorch CUDA — not Whisper model weights)"
+  DetailPrint "(PyInstaller onedir: Python, Qt, PyTorch CUDA - not Whisper model weights)"
   DetailPrint ""
+  DetailPrint "Downloading via PowerShell (HTTPS / GitHub redirects)..."
+  DetailPrint "This may take a long time for a multi-GB file."
 
-  NSISdl::download /TRANSLATE2 /END "Download: $9 (%u KB of %k KB at %s KB/s)" "${PAYLOAD_URL}" "$0"
+  FileOpen $1 "$PLUGINSDIR\download-payload.ps1" w
+  FileWrite $1 "$$ErrorActionPreference = 'Stop'$\r$\n"
+  FileWrite $1 "$$ProgressPreference = 'SilentlyContinue'$\r$\n"
+  FileWrite $1 "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12$\r$\n"
+  FileWrite $1 "Write-Host 'URL: ${PAYLOAD_URL}'$\r$\n"
+  FileWrite $1 "Write-Host 'Saving to: $0'$\r$\n"
+  FileWrite $1 "Invoke-WebRequest -Uri '${PAYLOAD_URL}' -OutFile '$0' -UseBasicParsing$\r$\n"
+  FileClose $1
+
+  nsExec::ExecToLog 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$PLUGINSDIR\download-payload.ps1"'
   Pop $1
-  ${If} $1 != "success"
-    DetailPrint "Download failed: $1"
-    MessageBox MB_OK|MB_ICONSTOP "Could not download the application bundle.$\n$\nURL:$\n${PAYLOAD_URL}$\n$\nReason: $1$\n$\nCheck your connection and that the GitHub Release exists with the correct asset name."
+  ${If} $1 != 0
+    DetailPrint "PowerShell download failed (exit $1)."
+    MessageBox MB_OK|MB_ICONSTOP "Could not download the application bundle.$\n$\nURL:$\n${PAYLOAD_URL}$\n$\nPowerShell exit code: $1$\n$\nThe link may work in a browser but failed in the installer - check proxy/antivirus, or try again."
     Abort
   ${EndIf}
 
+  IfFileExists "$0" dl_ok 0
+    DetailPrint "ERROR: download file missing after PowerShell."
+    MessageBox MB_OK|MB_ICONSTOP "Download reported success but the file is missing:$\n$0"
+    Abort
+  dl_ok:
   DetailPrint "Download finished: $0"
   DetailPrint ""
   DetailPrint "Extracting to: $INSTDIR"
@@ -183,6 +205,8 @@ Function .onInit
     MessageBox MB_OK|MB_ICONSTOP "${PRODUCT_NAME} requires 64-bit Windows."
     Abort
   ${EndIf}
+  ; Directory page "Space required" — estimate for bundle + extract (not Setup.exe size).
+  SectionSetSize ${SID_MAIN} ${ESTIMATED_INSTALL_KB}
 FunctionEnd
 
 Function .onInstFailed

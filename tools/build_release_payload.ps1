@@ -47,6 +47,7 @@ $sevenZ = $null
 foreach ($c in @(
         "${Env:ProgramFiles}\7-Zip\7z.exe",
         "${Env:ProgramFiles(x86)}\7-Zip\7z.exe"
+        "..\installer\redist\7zr.exe"
     )) {
     if (Test-Path $c) { $sevenZ = $c; break }
 }

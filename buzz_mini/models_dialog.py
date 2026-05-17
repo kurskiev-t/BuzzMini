@@ -63,8 +63,9 @@ class ModelsPanel(QWidget):
         info.setWordWrap(True)
 
         self._tree = QTreeWidget()
-        self._tree.setColumnCount(1)
-        self._tree.setHeaderHidden(True)
+        self._tree.setColumnCount(2)
+        self._tree.setHeaderLabels(["Model", "Size (approx.)"])
+        self._tree.setColumnWidth(0, 220)
         self._tree.setAlternatingRowColors(True)
         self._tree.currentItemChanged.connect(self._on_current_changed)
 
@@ -118,10 +119,12 @@ class ModelsPanel(QWidget):
         self._tree.clear()
         downloaded_root = QTreeWidgetItem(self._tree)
         downloaded_root.setText(0, "Downloaded")
+        downloaded_root.setText(1, "")
         downloaded_root.setFlags(downloaded_root.flags() & ~Qt.ItemFlag.ItemIsSelectable)
 
         available_root = QTreeWidgetItem(self._tree)
         available_root.setText(0, "Available for Download")
+        available_root.setText(1, "")
         available_root.setFlags(available_root.flags() & ~Qt.ItemFlag.ItemIsSelectable)
 
         for entry in MODEL_ENTRIES:
@@ -129,6 +132,7 @@ class ModelsPanel(QWidget):
             parent = downloaded_root if installed else available_root
             item = QTreeWidgetItem(parent)
             item.setText(0, entry.title)
+            item.setText(1, entry.size_hint)
             item.setData(0, Qt.ItemDataRole.UserRole, entry.model_id)
 
         self._tree.expandToDepth(2)

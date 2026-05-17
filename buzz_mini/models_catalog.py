@@ -40,22 +40,24 @@ ALLOW_PATTERNS = [
 class ModelEntry:
     model_id: str
     title: str
+    size_hint: str  # approximate HF download (CTranslate2 weights)
 
 
 # Order matches Buzz “Whisper” group (minus custom / lumii).
+# Sizes: rough HF repo download; actual disk use similar (+ cache metadata).
 MODEL_ENTRIES: tuple[ModelEntry, ...] = (
-    ModelEntry("tiny", "Tiny"),
-    ModelEntry("tiny.en", "Tiny.En"),
-    ModelEntry("base", "Base"),
-    ModelEntry("base.en", "Base.En"),
-    ModelEntry("small", "Small"),
-    ModelEntry("small.en", "Small.En"),
-    ModelEntry("medium", "Medium"),
-    ModelEntry("medium.en", "Medium.En"),
-    ModelEntry("large-v1", "Large"),
-    ModelEntry("large-v2", "Large-V2"),
-    ModelEntry("large-v3", "Large-V3"),
-    ModelEntry("large-v3-turbo", "Large-V3-Turbo"),
+    ModelEntry("tiny", "Tiny", "~75 MB"),
+    ModelEntry("tiny.en", "Tiny.En", "~75 MB"),
+    ModelEntry("base", "Base", "~145 MB"),
+    ModelEntry("base.en", "Base.En", "~145 MB"),
+    ModelEntry("small", "Small", "~470 MB"),
+    ModelEntry("small.en", "Small.En", "~470 MB"),
+    ModelEntry("medium", "Medium", "~1.5 GB"),
+    ModelEntry("medium.en", "Medium.En", "~1.5 GB"),
+    ModelEntry("large-v1", "Large", "~2.9 GB"),
+    ModelEntry("large-v2", "Large-V2", "~2.9 GB"),
+    ModelEntry("large-v3", "Large-V3", "~3.1 GB"),
+    ModelEntry("large-v3-turbo", "Large-V3-Turbo", "~1.6 GB"),
 )
 
 
