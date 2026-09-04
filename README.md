@@ -15,7 +15,7 @@ A minimal push-to-talk app with no cloud — inspired by Buzz, but simpler and f
 - System tray icon; record while holding a two-key chord (default **Left Ctrl + Space**). In **Settings** you can pick left/right Ctrl and the second key — Space or Win/Cmd/Super. Override with `BUZZMINI_PTT_CHORD`.
 - Choose a Whisper model and download from Hugging Face (tray menu **Models…**).
 - Microphone and PTT chord in **Settings**.
-- **Donate** in the tray menu — support the project (VTB Paymo, QR; see below).
+- **Donate** in the tray menu — support the project via [CloudTips](https://pay.cloudtips.ru/p/3fbf7934).
 
 ## Requirements
 
@@ -154,8 +154,6 @@ If the package is not installed editable, set `PYTHONPATH` to the repo root (fol
 
 ## Support the project
 
-Development is spare-time work. If BuzzMini helps you, you can support the author (**Timur K.**) via **CloudTips**:
+Development is spare-time work. If BuzzMini helps you, you can support the author (**Timur K.**) via **[CloudTips](https://pay.cloudtips.ru/p/3fbf7934)** (Russian bank cards, SBP, and other methods on the payment page).
 
-- **Link:** [donation page](https://pay.cloudtips.ru/p/3fbf7934)
-
-In the app: tray menu → **Donate** or the **Donate** tab — same text, link, and QR.
+In the app: tray menu → **Donate** or the **Donate** tab — same link.
