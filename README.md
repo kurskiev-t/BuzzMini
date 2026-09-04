@@ -154,7 +154,7 @@ If the package is not installed editable, set `PYTHONPATH` to the repo root (fol
 
 ## Support the project
 
-Development is spare-time work. If BuzzMini helps you, you can support the author (**Timur K.**) via **VTB (Paymo)**:
+Development is spare-time work. If BuzzMini helps you, you can support the author (**Timur K.**) via **CloudTips**:
 
 - **Link:** [donation page](https://pay.cloudtips.ru/p/3fbf7934)
 
