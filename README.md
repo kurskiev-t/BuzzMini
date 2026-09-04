@@ -156,6 +156,6 @@ If the package is not installed editable, set `PYTHONPATH` to the repo root (fol
 
 Development is spare-time work. If BuzzMini helps you, you can support the author (**Timur K.**) via **VTB (Paymo)**:
 
-- **Link:** [donation page]([https://vtb.paymo.ru/collect-money/?transaction=f77f0675-61b6-4914-bca1-97a2eff8c32d](https://pay.cloudtips.ru/p/3fbf7934))
+- **Link:** [donation page](https://pay.cloudtips.ru/p/3fbf7934)
 
 In the app: tray menu → **Donate** or the **Donate** tab — same text, link, and QR.
