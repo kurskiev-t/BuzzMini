@@ -6,7 +6,7 @@ import os
 import sys
 from typing import Optional
 
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 )
 
 from buzz_mini.audio_devices import input_devices_for_ui
+from buzz_mini.backends.select import resolve_backend_name
 from buzz_mini.engine import transcription_device_summary
 from buzz_mini.settings_store import DictateSettings
 
@@ -44,14 +45,9 @@ class SettingsPanel(QWidget):
         self._settings = settings
 
         layout = QVBoxLayout(self)
-
-        device_label, device_warn = transcription_device_summary()
-        device_text = f"Transcription device: {device_label}"
-        if device_warn:
-            device_text += f"\n{device_warn}"
-        self._device_info = QLabel(device_text)
-        self._device_info.setWordWrap(True)
-        layout.addWidget(self._device_info)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(10)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         env_ptt = os.environ.get("BUZZMINI_PTT_CHORD", "").strip()
         if env_ptt:
@@ -72,6 +68,17 @@ class SettingsPanel(QWidget):
             )
 
         form = QFormLayout()
+        form.setContentsMargins(0, 0, 0, 0)
+        form.setVerticalSpacing(8)
+
+        backend = resolve_backend_name()
+        device_label, device_warn = transcription_device_summary()
+        device_text = f"{backend} — {device_label}"
+        if device_warn:
+            device_text += f"\n{device_warn}"
+        self._device_info = QLabel(device_text)
+        self._device_info.setWordWrap(True)
+        form.addRow("Transcription:", self._device_info)
 
         self._combo_mod = QComboBox()
         self._combo_mod.addItem("Left Ctrl", "ctrl_l")
@@ -121,6 +128,7 @@ class SettingsPanel(QWidget):
         save_row.addStretch(1)
         save_row.addWidget(self._save_btn)
         layout.addLayout(save_row)
+        layout.addStretch(1)
 
     def _on_save(self) -> None:
         self.apply()

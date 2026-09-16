@@ -16,6 +16,9 @@ dependencies = [
 
 [project.optional-dependencies]
 win-build = ["pyinstaller>=6.0,<7"]
+# vulkan/amd path uses whisper.cpp binaries (tools/build_whispercpp_windows.ps1), not extra pip wheels.
+vulkan = []
+dev = ["pyinstaller>=6.0,<7"]
 
 [project.scripts]
 buzz-mini = "buzz_mini.app:main"
