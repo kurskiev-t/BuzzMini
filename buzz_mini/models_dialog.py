@@ -100,10 +100,7 @@ class ModelsPanel(QWidget):
     def cancel_download_on_exit(self) -> None:
         """Stop HF download and close progress UI (app shutdown)."""
         self._on_download_cancel()
-        if self._progress is not None:
-            self._progress.disconnect_cancel(self._on_download_cancel)
-            self._progress.close()
-            self._progress = None
+        self._close_progress_safely()
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self.cancel_download_on_exit()
@@ -195,17 +192,22 @@ class ModelsPanel(QWidget):
 
         self._download_btn.setEnabled(False)
 
-        task = ModelSnapshotDownloadTask(repo_id_for_model(mid), self._download_root)
+        task = ModelSnapshotDownloadTask(repo_id_for_model(mid), self._download_root, model_id=mid)
         self._current_task = task
         task.signals.finished.connect(lambda _p: self._on_download_finished())
         task.signals.error.connect(self._on_download_error)
-        task.signals.progress.connect(self._progress.set_detail_text)
+        task.signals.progress.connect(self._progress.set_progress)
         task.signals.aborted.connect(self._on_download_aborted)
         self._pool.start(task)
         self._progress.show()
 
     def _close_progress_safely(self) -> None:
         if self._progress is not None:
+            if self._current_task is not None:
+                try:
+                    self._current_task.signals.progress.disconnect(self._progress.set_progress)
+                except TypeError:
+                    pass
             self._progress.disconnect_cancel(self._on_download_cancel)
             self._progress.close()
             self._progress = None
@@ -215,11 +217,14 @@ class ModelsPanel(QWidget):
             self._current_task.cancel()
 
     def _on_download_finished(self) -> None:
-        self._close_progress_safely()
-        self._current_task = None
-        self._download_btn.setEnabled(True)
-        self._populate_tree()
-        self._sync_buttons()
+        try:
+            self._close_progress_safely()
+            self._current_task = None
+            self._download_btn.setEnabled(True)
+            self._populate_tree()
+            self._sync_buttons()
+        except Exception:
+            logger.exception("UI update after model download failed")
 
     def _on_download_aborted(self) -> None:
         logger.info("Model download canceled by user")
@@ -258,7 +263,7 @@ class ModelsPanel(QWidget):
         reply = QMessageBox.question(
             self.window() or self,
             "Delete model",
-            f"Remove “{title}” from the Hugging Face cache on disk?",
+            f"Remove “{title}” from disk?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )

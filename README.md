@@ -113,9 +113,9 @@ Two artifacts on [GitHub Releases](https://github.com/kurskiev-t/BuzzMini/releas
 
 1. **`.\tools\build_windows.ps1`** → **`dist\BuzzMini\`**
 2. Install [7-Zip](https://www.7-zip.org/) (step 3) and [NSIS](https://nsis.sourceforge.io/) (`winget install NSIS.NSIS`)
-3. **`.\tools\build_release_payload.ps1`** → **`dist\BuzzMini-1.0.1-win64.7z`** (name from **`installer\release.json`**)
-4. Create a GitHub Release tagged **`1.0.1`** (like [0.1.0](https://github.com/kurskiev-t/BuzzMini/releases/tag/0.1.0), no `v` prefix), attach the **`.7z`**
-5. **`.\tools\build_installer.ps1`** → **`dist\BuzzMini-Setup-1.0.1.exe`**, attach to the same release
+3. **`.\tools\build_release_payload.ps1`** → **`dist\BuzzMini-1.1.0-win64.7z`** (name from **`installer\release.json`**)
+4. Create a GitHub Release tagged **`1.1.0`** (like [0.1.0](https://github.com/kurskiev-t/BuzzMini/releases/tag/0.1.0), no `v` prefix), attach the **`.7z`**
+5. **`.\tools\build_installer.ps1`** → **`dist\BuzzMini-Setup-1.1.0.exe`**, attach to the same release
 
 During install, **Show details** shows the GitHub URL, download progress, and extraction. **Whisper weights** are still downloaded **on first use** from the **Models** tab, not by the installer.
 

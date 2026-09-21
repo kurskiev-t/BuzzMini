@@ -41,6 +41,20 @@ def main() -> None:
         a, b, lab = parse_ptt_chord_raw(cid)
         assert a is not None and b is not None and lab
 
+    from buzz_mini.model_download import format_download_status
+
+    text, frac = format_download_status("model.bin", 64 * 1048576, 72 * 1048576, 0.0, now=10.0)
+    assert "Downloading: model.bin" in text
+    assert "%" not in text
+    assert "kb/sec" in text or "MB/sec" in text
+    assert "ETA" in text
+    assert "(64.0/72.0 MB)" in text
+    assert 0.0 < frac < 1.0
+
+    text0, frac0 = format_download_status("model.bin", 0, 0, 0.0, now=1.0)
+    assert frac0 < 0
+    assert "%" not in text0
+
     print("SMOKE_OK")
 
 

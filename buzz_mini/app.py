@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 
 from buzz_mini.audio_ptt import PTTCapture
 from buzz_mini.engine import WhisperEngine, _resolve_download_root, transcription_device_summary
+from buzz_mini.model_download import configure_ssl_certs
 from buzz_mini.paths import assets_dir
 from buzz_mini.main_window import BuzzMainWindow, MainTab
 from buzz_mini.models_catalog import find_local_snapshot, title_for_id
@@ -366,6 +367,15 @@ def main() -> None:
         level=os.environ.get("BUZZMINI_LOG_LEVEL", "INFO"),
         format="%(levelname)s %(name)s: %(message)s",
     )
+
+    def _excepthook(exc_type, exc, tb) -> None:
+        logging.getLogger(__name__).error("Unhandled exception", exc_info=(exc_type, exc, tb))
+
+    sys.excepthook = _excepthook
+    if hasattr(threading, "excepthook"):
+        threading.excepthook = lambda args: _excepthook(args.exc_type, args.exc_value, args.exc_traceback)
+
+    configure_ssl_certs()
 
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)

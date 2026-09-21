@@ -113,9 +113,9 @@ cd BuzzMini
 
 1. **`.\tools\build_windows.ps1`** → **`dist\BuzzMini\`**
 2. Установить [7-Zip](https://www.7-zip.org/) (для шага 3) и [NSIS](https://nsis.sourceforge.io/) (`winget install NSIS.NSIS`)
-3. **`.\tools\build_release_payload.ps1`** → **`dist\BuzzMini-1.0.1-win64.7z`** (имя из **`installer\release.json`**)
-4. Создать GitHub Release с тегом **`1.0.1`** (как у [0.1.0](https://github.com/kurskiev-t/BuzzMini/releases/tag/0.1.0), без префикса `v`), прикрепить **`.7z`**
-5. **`.\tools\build_installer.ps1`** → **`dist\BuzzMini-Setup-1.0.1.exe`**, прикрепить к тому же Release
+3. **`.\tools\build_release_payload.ps1`** → **`dist\BuzzMini-1.1.0-win64.7z`** (имя из **`installer\release.json`**)
+4. Создать GitHub Release с тегом **`1.1.0`** (как у [0.1.0](https://github.com/kurskiev-t/BuzzMini/releases/tag/0.1.0), без префикса `v`), прикрепить **`.7z`**
+5. **`.\tools\build_installer.ps1`** → **`dist\BuzzMini-Setup-1.1.0.exe`**, прикрепить к тому же Release
 
 При установке в окне «Installing» (кнопка **Show details**) видно URL GitHub, прогресс загрузки и распаковку. **Веса Whisper** по-прежнему качаются **при первом запуске** из вкладки **Models**, не установщиком.
 

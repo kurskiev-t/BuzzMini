@@ -20,7 +20,16 @@ _datas = []
 _binaries = []
 _hiddenimports: list[str] = []
 
-for name in ("torch", "PyQt6", "ctranslate2", "onnxruntime", "av", "tokenizers"):
+for name in (
+    "torch",
+    "PyQt6",
+    "ctranslate2",
+    "onnxruntime",
+    "av",
+    "tokenizers",
+    "certifi",
+    "huggingface_hub",
+):
     try:
         ds, bs, hi = collect_all(name)
         _datas += ds

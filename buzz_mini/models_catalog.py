@@ -67,6 +67,54 @@ def repo_id_for_model(model_id: str) -> str:
     return f"Systran/faster-whisper-{model_id}"
 
 
+# --- GitHub Release mirror (fallback when Hugging Face is unreachable) ---
+# Models are published as buzzmini-model-<id>.zip + models.json manifest
+# under a dedicated tag (see tools/make_model_assets.ps1). Unpacked into
+# <download_root>/github-models/<id>/ — same root as the HF cache, but a
+# plain folder (no fake HF commit-hash layout to maintain).
+GITHUB_MODELS_REPO = os.environ.get("BUZZMINI_MODELS_REPO", "kurskiev-t/BuzzMini")
+GITHUB_MODELS_TAG = os.environ.get("BUZZMINI_MODELS_TAG", "models-v1")
+GITHUB_MODEL_DIRNAME = "github-models"
+
+
+def github_asset_name(model_id: str) -> str:
+    return f"buzzmini-model-{model_id}.zip"
+
+
+def github_asset_url(
+    model_id: str,
+    repo: str | None = None,
+    tag: str | None = None,
+) -> str:
+    repo = repo or GITHUB_MODELS_REPO
+    tag = tag or GITHUB_MODELS_TAG
+    return f"https://github.com/{repo}/releases/download/{tag}/{github_asset_name(model_id)}"
+
+
+def github_manifest_url(
+    repo: str | None = None,
+    tag: str | None = None,
+) -> str:
+    repo = repo or GITHUB_MODELS_REPO
+    tag = tag or GITHUB_MODELS_TAG
+    return f"https://github.com/{repo}/releases/download/{tag}/models.json"
+
+
+def github_snapshot_dir(model_id: str, download_root: str | None = None) -> str:
+    download_root = download_root or _resolve_download_root()
+    return os.path.join(download_root, GITHUB_MODEL_DIRNAME, model_id)
+
+
+def find_github_snapshot(model_id: str, download_root: str | None = None) -> str | None:
+    """Return unpacked GitHub-mirror dir if usable, else None."""
+    if entry_for_id(model_id) is None:
+        return None
+    path = github_snapshot_dir(model_id, download_root)
+    if os.path.isdir(path) and _snapshot_usable(path):
+        return path
+    return None
+
+
 def entry_for_id(model_id: str) -> ModelEntry | None:
     for e in MODEL_ENTRIES:
         if e.model_id == model_id:
@@ -149,6 +197,10 @@ def find_local_snapshot(model_id: str, download_root: str | None = None) -> str 
     if entry_for_id(model_id) is None:
         return None
 
+    github = find_github_snapshot(model_id, download_root)
+    if github:
+        return github
+
     download_root = download_root or _resolve_download_root()
     repo = repo_id_for_model(model_id)
 
@@ -178,6 +230,12 @@ def delete_model_cache(model_id: str, download_root: str | None = None) -> None:
     if not snapshot:
         return
     if is_local_snapshot_directory(model_id):
+        shutil.rmtree(snapshot, ignore_errors=True)
+        return
+    # GitHub mirror layout is a plain per-model folder — remove only it
+    # (the HF branch below deletes the shared repo cache root instead).
+    mirror_root = os.path.normpath(os.path.join(download_root or _resolve_download_root(), GITHUB_MODEL_DIRNAME))
+    if os.path.normpath(snapshot).startswith(mirror_root + os.sep):
         shutil.rmtree(snapshot, ignore_errors=True)
         return
     # Buzz: go up from snapshot file folder to shared repo cache root

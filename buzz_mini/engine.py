@@ -205,6 +205,19 @@ class WhisperEngine:
         os.makedirs(model_root_dir, exist_ok=True)
         logger.info("faster-whisper download_root=%s", model_root_dir)
 
+        # GitHub-mirror copy (plain folder) wins over the HF id — faster-whisper
+        # accepts an absolute snapshot path just like BUZZMINI_MODEL=<path>.
+        try:
+            from buzz_mini.models_catalog import entry_for_id, find_github_snapshot
+
+            if entry_for_id(self.model_size_or_path) is not None:
+                gh = find_github_snapshot(self.model_size_or_path, model_root_dir)
+                if gh:
+                    logger.info("Using GitHub-mirror snapshot: %s", gh)
+                    self.model_size_or_path = gh
+        except Exception as exc:
+            logger.debug("GitHub-mirror resolve skipped: %s", exc)
+
         force_cpu = os.environ.get("BUZZMINI_FORCE_CPU", os.environ.get("BUZZ_FORCE_CPU", "false"))
         cuda_ok = torch.cuda.is_available()
         cuda_ver = getattr(torch.version, "cuda", None)

@@ -98,11 +98,25 @@ class ModelDownloadProgressDialog(QDialog):
         except TypeError:
             pass
 
-    def set_detail_text(self, text: str) -> None:
-        """Update the line under the progress bar (during download)."""
+    def set_progress(self, text: str, frac: float = -1.0) -> None:
+        """Update text + bar atomically (one signal → no label/bar skew)."""
         if self._error_mode:
             return
         self._detail.setText(text)
+        try:
+            f = float(frac)
+        except (TypeError, ValueError):
+            return
+        if f < 0 or f != f or f == float("inf") or f == float("-inf"):
+            self._bar.setRange(0, 0)
+            self._bar.setTextVisible(False)
+            return
+        # 0–100 so Qt's "%p%" is the only percent the user sees (no 0–1000 rounding skew).
+        pct = int(round(min(1.0, max(0.0, f)) * 100.0))
+        self._bar.setRange(0, 100)
+        self._bar.setValue(pct)
+        self._bar.setFormat("%p%")
+        self._bar.setTextVisible(True)
 
     def show_error(self, message: str) -> None:
         """Switch to failure layout; keep dialog open until the user dismisses it."""
