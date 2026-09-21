@@ -1,4 +1,4 @@
-"""Download faster-whisper snapshots: GitHub Release mirror first, Hugging Face fallback.
+"""Download faster-whisper snapshots: Hugging Face first, GitHub Release mirror fallback.
 
 The GitHub mirror (tag ``models-v1``) exists because Hugging Face is
 unreachable from some networks — the HF request then hangs on "Connecting…"
@@ -432,7 +432,7 @@ class DownloadSignals(QObject):
 
 
 class ModelSnapshotDownloadTask(QRunnable):
-    """Runs GitHub-mirror download first, then HF snapshot_download like Buzz."""
+    """Hugging Face snapshot_download first; GitHub Release mirror if HF fails."""
 
     def __init__(self, repo_id: str, cache_dir: str, model_id: str | None = None) -> None:
         super().__init__()
@@ -486,43 +486,13 @@ class ModelSnapshotDownloadTask(QRunnable):
                 return
             self.signals.error.emit(str(exc) or "Download failed (uncaught error).")
 
-    def _run_impl(self) -> None:
-        def emit_p(text: str, frac: float = -1.0) -> None:
-            self.signals.progress.emit(text, frac)
+    def _try_huggingface(
+        self, emit_p: Callable[[str, float], None]
+    ) -> tuple[str, str | None]:
+        """HF snapshot_download in a child process.
 
-        # 1) GitHub Release mirror (fast fail -> HF fallback, not an error).
-        skip_github = os.environ.get("BUZZMINI_DISABLE_GITHUB_MIRROR", "").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-        )
-        if self.model_id and not skip_github:
-            try:
-                path = _download_github_model(
-                    self.model_id,
-                    self.cache_dir,
-                    emit_p,
-                    lambda: self.stopped,
-                )
-            except _DownloadCancelled:
-                logger.info("GitHub mirror download aborted repo=%s", self.repo_id)
-                self.signals.aborted.emit()
-                return
-            except Exception as exc:
-                if self.stopped:
-                    self.signals.aborted.emit()
-                    return
-                logger.warning("GitHub mirror failed (%s), falling back to Hugging Face", exc)
-                emit_p("GitHub mirror unavailable, trying Hugging Face…")
-            else:
-                if self.stopped:
-                    self.signals.aborted.emit()
-                    return
-                logger.info("Model download finished repo=%s path=%s", self.repo_id, path)
-                self.signals.finished.emit(str(path))
-                return
-
-        # 2) Hugging Face (original Buzz-style path).
+        Returns ``('ok', path)``, ``('abort', None)``, or ``('err', message)``.
+        """
         configure_ssl_certs()
         max_workers = 1 if sys.platform == "win32" else 8
         result_queue: multiprocessing.Queue = multiprocessing.Queue()
@@ -556,8 +526,7 @@ class ModelSnapshotDownloadTask(QRunnable):
                     proc.join(timeout=120)
                 self._drain_progress(progress_queue, emit_p)
                 logger.info("Model download aborted repo=%s", self.repo_id)
-                self.signals.aborted.emit()
-                return
+                return ("abort", None)
             if time.monotonic() - last_progress_at >= _HF_STALL_S:
                 logger.error(
                     "Hugging Face download stalled for %ss repo=%s — terminating worker",
@@ -568,38 +537,82 @@ class ModelSnapshotDownloadTask(QRunnable):
                     proc.terminate()
                     proc.join(timeout=30)
                 self._drain_progress(progress_queue, emit_p)
-                self.signals.error.emit(
+                return (
+                    "err",
                     f"Hugging Face did not respond within {_HF_STALL_S} seconds "
-                    "(connection hung). Check the network, VPN, or firewall for BuzzMini.exe."
+                    "(connection hung).",
                 )
-                return
             proc.join(timeout=0.08)
 
         self._drain_progress(progress_queue, emit_p)
 
         if self.stopped:
-            self.signals.aborted.emit()
-            return
+            return ("abort", None)
 
         if proc.exitcode != 0:
             msg = f"Download process failed (exit code {proc.exitcode})."
             logger.error("%s repo=%s", msg, self.repo_id)
-            self.signals.error.emit(msg)
-            return
+            return ("err", msg)
 
         try:
             status, payload = result_queue.get_nowait()
         except queue.Empty:
             msg = "Download returned no result (empty queue)."
             logger.error("%s repo=%s exit=%s", msg, self.repo_id, proc.exitcode)
-            self.signals.error.emit(msg)
-            return
+            return ("err", msg)
 
         if status != "ok":
             err = str(payload)
             logger.error("Model download failed repo=%s: %s", self.repo_id, err)
-            self.signals.error.emit(err)
+            return ("err", err)
+
+        return ("ok", str(payload))
+
+    def _run_impl(self) -> None:
+        def emit_p(text: str, frac: float = -1.0) -> None:
+            self.signals.progress.emit(text, frac)
+
+        status, payload = self._try_huggingface(emit_p)
+        if status == "abort" or self.stopped:
+            self.signals.aborted.emit()
+            return
+        if status == "ok" and payload:
+            logger.info("Model download finished repo=%s path=%s", self.repo_id, payload)
+            self.signals.finished.emit(payload)
             return
 
-        logger.info("Model download finished repo=%s path=%s", self.repo_id, payload)
-        self.signals.finished.emit(str(payload))
+        hf_err = payload or "Hugging Face download failed."
+        skip_github = os.environ.get("BUZZMINI_DISABLE_GITHUB_MIRROR", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        if not self.model_id or skip_github:
+            self.signals.error.emit(hf_err)
+            return
+
+        logger.warning("Hugging Face failed (%s), falling back to GitHub mirror", hf_err)
+        emit_p("Hugging Face unavailable, trying GitHub mirror…")
+        try:
+            path = _download_github_model(
+                self.model_id,
+                self.cache_dir,
+                emit_p,
+                lambda: self.stopped,
+            )
+        except _DownloadCancelled:
+            logger.info("GitHub mirror download aborted repo=%s", self.repo_id)
+            self.signals.aborted.emit()
+            return
+        except Exception as exc:
+            if self.stopped:
+                self.signals.aborted.emit()
+                return
+            logger.error("GitHub mirror failed after HF: %s", exc)
+            self.signals.error.emit(f"{hf_err} GitHub mirror also failed: {exc}")
+            return
+        if self.stopped:
+            self.signals.aborted.emit()
+            return
+        logger.info("Model download finished repo=%s path=%s", self.repo_id, path)
+        self.signals.finished.emit(str(path))
