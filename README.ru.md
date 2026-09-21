@@ -6,52 +6,72 @@
 
 # BuzzMini
 
-Локальное распознавание речи «на лету»: нажал горячие клавиши — продиктовал — текст вставился в активное окно (буфер обмена + симуляция вставки). Работает через **faster-whisper** и **PyTorch**; при наличии NVIDIA GPU транскрипция идёт на видеокарте.
+Зажал хоткей — надиктовал — отпустил: текст вставляется туда, где курсор.
 
-Идея — минимальный Push-to-talk без облака, в духе Buzz, но проще и под свой сценарий.
+Офлайн push-to-talk для **Windows**, **Linux** и **macOS**. Без облака и подписок. Речь распознаётся на этом компьютере через [faster-whisper](https://github.com/SYSTRAN/faster-whisper).
+
+**[Скачать для Windows (Setup.exe)](https://github.com/kurskiev-t/BuzzMini/releases/latest)**
+
+<!-- Когда будет ролик 5–10 с (Блокнот или Telegram → Ctrl+Space → фраза → текст) — положите assets/demo.gif и раскомментируйте:
+![Демо](assets/demo.gif)
+-->
+
+## Зачем BuzzMini?
+
+| | |
+|--|--|
+| **Не системная диктовка Windows** | Русский обычно заметно лучше, не нужны облачные службы Microsoft и онлайн-аккаунт. |
+| **Не оригинальный [Buzz](https://github.com/chidiwilliams/buzz)** | Одна задача: диктовать в любое окно. Живёт в трее, без лишних окон. |
+| **Приватность** | Аудио никуда не уходит — ни в Яндекс, ни в Google, ни в OpenAI. |
+
+По умолчанию аккорд: **левый Ctrl + пробел** (меняется в **Settings**). Если есть NVIDIA с CUDA — распознавание на GPU, иначе CPU.
+
+Это **речь → текст**, не чат-LLM. Грузится один вес Whisper и обрабатывает аудио.
+
+## Установка (Windows)
+
+1. Откройте **[Releases](https://github.com/kurskiev-t/BuzzMini/releases/latest)** и скачайте **`BuzzMini-Setup-*.exe`**.
+2. Установите. Приложение появится в **системном трее**.
+3. Трей → **Models…** → выберите модель → **Download**, затем **Apply selection and reload model**. Для русского удобны **Small** или **Medium**; **Large-V3-Turbo** — если хватает RAM/VRAM.
+4. Курсор в любое текстовое поле, **зажать** аккорд, сказать, **отпустить**. Текст вставляется сразу.
+
+Веса Whisper качаются при первом использовании (Hugging Face, запасной путь — зеркало на GitHub Release), в Setup.exe их нет.
+
+**AMD / Intel GPU** не используются: распознавание на **CPU** — берите Tiny / Base / Small.
 
 ## Возможности
 
-- Иконка в системном трее, запись по удержанию комбинации из двух клавиш (по умолчанию **левый Ctrl + пробел**; в **Settings** можно выбрать левый/правый Ctrl и вторую клавишу — пробел или Win/Cmd/Super). Переменная `BUZZMINI_PTT_CHORD` переопределяет выбор.
-- Выбор модели Whisper и загрузка с Hugging Face (в трее: **Models…**).
-- Микрофон и аккорд PTT в **Settings**.
-- Диалог **Donate — Донат** в меню трея — поддержка проекта через [CloudTips](https://pay.cloudtips.ru/p/3fbf7934).
+- Иконка в трее; запись по удержанию двух клавиш (левый/правый Ctrl + пробел или Win/Cmd).
+- Выбор и загрузка модели в **Models…**.
+- Микрофон и аккорд в **Settings**.
+- **Donate** в трее — [CloudTips](https://pay.cloudtips.ru/p/3fbf7934).
 
-## Требования
+<details>
+<summary>Модели, размер на диске и VRAM</summary>
 
-- **Python 3.12–3.14**
-- Windows / Linux / macOS (GPU на Windows чаще всего через CUDA-сборку PyTorch).
-- Для GPU: драйвер NVIDIA и в venv должен стоять **`torch` с CUDA** (не путать с колёсом **CPU-only** с PyPI). Системный `python` или один лишь `pip install -e .` без отдельного шага для Windows часто дают **CPU** `torch` → в логах будет `torch.cuda=False`.
-- **AMD / Intel GPU:** ускорение на видеокарте **не поддерживается** (нужна NVIDIA + CUDA). На таких ПК распознавание идёт на **CPU** — выберите модель поменьше (Small / Base).
+Те же размеры, что у типичного OpenAI Whisper (**.en** — только английский):
 
-### Это не «LLM для чата»
-
-В BuzzMini под капотом **Whisper** (распознавание речи в текст), через **faster-whisper** + **CTranslate2**. Отдельной большой языковой модели для диалогов нет: один выбранный вес Whisper грузится в память и обрабатывает аудио.
-
-### Модели в диалоге «Models…» и железо
-
-В списке доступны те же размеры, что и у типичного OpenAI Whisper (варианты **`.en`** — только английский, обычно чуть компактнее по задаче):
-
-| Модель (id) | Ориентировочный размер на диске | Заметка |
-|---------------|----------------------------------|--------|
-| **Tiny** / **Tiny.En** | ~75 МБ | Быстро даже на CPU, качество ниже. |
-| **Base** / **Base.En** | ~150 МБ | Разумный минимум для повседневных тестов. |
-| **Small** / **Small.En** | ~500 МБ | Баланс скорости и качества на CPU. |
+| Модель (id) | На диске | Заметка |
+|---------------|----------|--------|
+| **Tiny** / **Tiny.En** | ~75 МБ | Быстро на CPU, качество ниже. |
+| **Base** / **Base.En** | ~150 МБ | Разумный минимум. |
+| **Small** / **Small.En** | ~500 МБ | Баланс на CPU. |
 | **Medium** / **Medium.En** | ~1,5 ГБ | Комфортнее при **≥8 ГБ** RAM на CPU. |
-| **Large** (`large-v1`) | ~3 ГБ | Тяжелее по RAM/VRAM. |
-| **Large-V2** | ~3 ГБ | |
-| **Large-V3** | ~3 ГБ | |
-| **Large-V3-Turbo** | ~1,5–2,5 ГБ | Быстрее «полного» large-v3, хороший компромисс. |
+| **Large** (`large-v1`) / **V2** / **V3** | ~3 ГБ | Тяжелее по RAM/VRAM. |
+| **Large-V3-Turbo** | ~1,5–2,5 ГБ | Быстрее полного large-v3. |
 
-**Windows / Linux с NVIDIA:** при CUDA 12+ и `torch` с CUDA движок по умолчанию идёт на **GPU** (`cuda`). Ориентир по **VRAM** (зависит от драйвера и `compute_type`): *tiny/base* — от порядка **1 ГБ**; *small* — ~**2 ГБ**; *medium* — ~**4–6 ГБ**; *large* / *v2* / *v3* — часто **8 ГБ и больше** комфортнее. Меньше VRAM — см. `BUZZMINI_REDUCE_VRAM` / `BUZZ_REDUCE_GPU_MEMORY` в коде (режим экономии).
+**Windows / Linux + NVIDIA:** CUDA 12+ и `torch` с CUDA → устройство `cuda`. Ориентир по **VRAM**: tiny/base ~1 ГБ; small ~2 ГБ; medium ~4–6 ГБ; large часто 8 ГБ+. Мало VRAM: `BUZZMINI_REDUCE_VRAM` / `BUZZ_REDUCE_GPU_MEMORY`.
 
-**macOS (в т.ч. Mac Pro / MacBook):** в текущей версии движок faster-whisper запускается на **CPU** (Apple GPU через Metal **не** подключён к этому пути). Это нормально: *tiny* / *base* / *small* работают заметно быстрее, *medium* и тем более *large* — дольше; для Mac Pro с большим объёмом RAM удобнее не гнаться за самым большим весом без нужды. PTT с **Cmd** как второй клавишей поддерживается (см. настройки / `BUZZMINI_PTT_CHORD`).
+**macOS:** faster-whisper идёт на **CPU** (Metal не подключён). Практичный выбор — tiny / base / small. Cmd как вторая клавиша PTT поддерживается.
 
-## Установка и запуск
+</details>
 
-Рекомендуется виртуальное окружение в корне репозитория.
+<details>
+<summary>Linux, macOS и запуск из исходников (Python, uv, pip)</summary>
 
-### Через uv
+Нужен Python **3.12–3.14**. Виртуальное окружение — в корне репозитория.
+
+### uv (рекомендуется)
 
 ```bash
 cd BuzzMini
@@ -59,15 +79,11 @@ uv sync
 uv run buzz-mini
 ```
 
-### Через pip
+На Windows uv сам берёт wheel **cu126** через `[tool.uv.sources]` в `pyproject.toml`.
 
-**Важно (Windows + NVIDIA):** `pip install -e .` **одной командой** почти всегда ставит **`torch` с PyPI без CUDA** (как у вас: `torch-2.x.x-cp314-win_amd64.whl` с pypi.org → `torch.cuda=False`). Настройки **`[tool.uv.sources]`** в `pyproject.toml` учитывает только **`uv`**, не `pip`.
+### pip
 
-Варианты:
-
-1. **Рекомендуется:** раздел **«Через uv»** выше — там под Windows подставляется wheel **cu126** автоматически.
-
-2. **Через pip:** сначала CUDA-сборный `torch`, потом проект (или переустановите `torch`, если уже поставили `-e .`):
+Один `pip install -e .` на Windows обычно ставит **CPU-only** `torch` (`torch.cuda=False`). Сначала CUDA-сборка:
 
 ```bat
 cd BuzzMini
@@ -77,83 +93,85 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pip install -e .
 ```
 
-Если вы уже сделали `pip install -e .` и видите CPU:
+Если CPU-torch уже стоит:
 
 ```bat
 .venv\Scripts\python.exe -m pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu126
 ```
 
-### Запуск приложения
+### Запуск
 
-**Windows:** двойной щелчок по **`scripts\run-buzz-mini.bat`** — скрипт сам создаст `.venv` при необходимости, поставит **PyTorch cu126**, выполнит **`pip install -e .`** и запустит приложение (иконка в трее; окно — через меню трея **Open Buzz Mini** или разделы **Models / Settings / …**).
+**Windows:** двойной щелчок по **`scripts\run-buzz-mini.bat`** — создаст `.venv` при необходимости, поставит PyTorch cu126, `pip install -e .` и запустит трей.
 
-Если окружение уже собрано (`uv sync` или руками), можно по-прежнему вызывать только интерпретатор:
+Если окружение уже готово:
 
 ```bat
 cd BuzzMini
 .\.venv\Scripts\python.exe -m buzz_mini.app
 ```
 
-После `pip install -e .` можно также вызывать консольную команду `buzz-mini`, если активирован нужный venv.
-
-### Сборка Windows (разработка, PyInstaller)
-
-В репозитории: **`BuzzMini.spec`** и **`tools/build_windows.ps1`**. Нужен тот же **`.venv`** с **CUDA PyTorch**, что и для обычного запуска; в `pyproject.toml` — optional extra **`win-build`**. Итог: каталог **`dist/BuzzMini/`** с **`BuzzMini.exe`** (порядка нескольких ГБ вместе с зависимостями).
-
-### Установщик Windows (NSIS, web-installer)
-
-Два артефакта на [GitHub Release](https://github.com/kurskiev-t/BuzzMini/releases):
-
-| Файл | Как собрать | Назначение |
-|------|-------------|------------|
-| **`BuzzMini-<версия>-win64.7z`** | **`.\tools\build_release_payload.ps1`** | PyInstaller onedir (~ГБ), качается при установке |
-| **`BuzzMini-Setup-<версия>.exe`** | **`.\tools\build_installer.ps1`** | Маленький установщик (качает `.7z` с GitHub) |
-
-**Порядок для релиза:**
-
-1. **`.\tools\build_windows.ps1`** → **`dist\BuzzMini\`**
-2. Установить [7-Zip](https://www.7-zip.org/) (для шага 3) и [NSIS](https://nsis.sourceforge.io/) (`winget install NSIS.NSIS`)
-3. **`.\tools\build_release_payload.ps1`** → **`dist\BuzzMini-1.1.0-win64.7z`** (имя из **`installer\release.json`**)
-4. Создать GitHub Release с тегом **`1.1.0`** (как у [0.1.0](https://github.com/kurskiev-t/BuzzMini/releases/tag/0.1.0), без префикса `v`), прикрепить **`.7z`**
-5. **`.\tools\build_installer.ps1`** → **`dist\BuzzMini-Setup-1.1.0.exe`**, прикрепить к тому же Release
-
-При установке в окне «Installing» (кнопка **Show details**) видно URL GitHub, прогресс загрузки и распаковку. **Веса Whisper** по-прежнему качаются **при первом запуске** из вкладки **Models**, не установщиком.
-
-Конфиг URL: **`installer\release.json`** (`repository`, `tagTemplate`, `assetTemplate`). Переопределение: **`-PayloadUrl`**, **`-GithubRepo`**, **`-ProductVersion`** у `build_installer.ps1`.
+Или команда `buzz-mini` при активированном venv.
 
 ### Где лежат модели
 
-По умолчанию при запуске **из исходников** кэш моделей — папка **`models`** в корне репозитория (рядом с `pyproject.toml`). Иначе используется пользовательский кэш приложения и совместимость с каталогом Buzz.
+Из исходников: папка **`models/`** рядом с `pyproject.toml`. У установленного приложения — пользовательский кэш (совместим с каталогом Buzz). Переопределение: `BUZZMINI_MODEL_ROOT`.
 
-Переопределение:
-
-- `BUZZMINI_MODEL_ROOT` — свой каталог для весов и HF-снимков.
-
-### Полезные переменные окружения
+### Переменные окружения
 
 | Переменная | Назначение |
 |------------|------------|
-| `BUZZMINI_MODEL` | Модель по умолчанию (если не выбрано в настройках). |
-| `BUZZMINI_LANGUAGE` | Язык распознавания, например `ru`. |
-| `BUZZMINI_PTT_CHORD` | Аккорд из двух клавиш, например `ctrl_l+space`, `ctrl_r+win`; также принимается `ctrl+space` (как у Handy) — это левый Ctrl + пробел. |
+| `BUZZMINI_MODEL` | Модель по умолчанию, если не выбрано в UI. |
+| `BUZZMINI_LANGUAGE` | Язык, например `ru`. |
+| `BUZZMINI_PTT_CHORD` | Аккорд, например `ctrl_l+space`, `ctrl_r+win`; `ctrl+space` = левый Ctrl + пробел. |
 | `BUZZMINI_FORCE_CPU` | Не `false` — принудительно CPU. |
 | `BUZZMINI_DEVICE` | `cuda`, `cpu` или `auto`. |
-| `BUZZMINI_PASTE_DELAY_MS` | Задержка перед симуляцией вставки после записи в буфер (мс). |
-| `BUZZMINI_LOG_LEVEL` | Уровень логирования, например `DEBUG`. |
+| `BUZZMINI_PASTE_DELAY_MS` | Задержка перед вставкой после записи в буфер (мс). |
+| `BUZZMINI_LOG_LEVEL` | Например `DEBUG`. |
 
-## Smoke-тест без GUI
+</details>
 
-Проверяет импорты, диалог моделей без показа, движок `tiny` и разбор строк PTT (удобно для будущего CI).
+<details>
+<summary>Сборка Windows и установщик (для мейнтейнеров)</summary>
+
+**PyInstaller (разработка):** `BuzzMini.spec` + `tools/build_windows.ps1`. Тот же `.venv` с CUDA PyTorch; optional extra `win-build`. Итог: `dist/BuzzMini/` (`BuzzMini.exe`, несколько ГБ).
+
+**NSIS web-installer** — два файла на GitHub Release:
+
+| Файл | Как собрать | Назначение |
+|------|-------------|------------|
+| **`BuzzMini-<версия>-win64.7z`** | `.\tools\build_release_payload.ps1` | PyInstaller onedir, качается при установке |
+| **`BuzzMini-Setup-<версия>.exe`** | `.\tools\build_installer.ps1` | Маленький установщик (скачивает `.7z`) |
+
+Порядок релиза:
+
+1. `.\tools\build_windows.ps1` → `dist\BuzzMini\`
+2. [7-Zip](https://www.7-zip.org/) и [NSIS](https://nsis.sourceforge.io/) (`winget install NSIS.NSIS`)
+3. `.\tools\build_release_payload.ps1` → `dist\BuzzMini-1.1.0-win64.7z` (имя из `installer\release.json`)
+4. GitHub Release с тегом **`1.1.0`** (без `v`), прикрепить `.7z`
+5. `.\tools\build_installer.ps1` → `dist\BuzzMini-Setup-1.1.0.exe`, прикрепить к тому же релизу
+
+В установщике **Show details** показывает URL, загрузку и распаковку. Веса Whisper по-прежнему из вкладки **Models**.
+
+Конфиг URL: `installer\release.json`. Переопределения `build_installer.ps1`: `-PayloadUrl`, `-GithubRepo`, `-ProductVersion`.
+
+</details>
+
+<details>
+<summary>Smoke-тест без GUI</summary>
+
+Импорты, диалог моделей без показа, движок `tiny`, разбор PTT:
 
 ```bat
 cd BuzzMini
 .\.venv\Scripts\python.exe tools\smoke_test.py
 ```
 
-Если пакет не установлен в editable-режиме, задайте `PYTHONPATH` на корень репозитория (каталог с `pyproject.toml`).
+Если пакет не установлен editable — задайте `PYTHONPATH` на корень репозитория.
+
+</details>
 
 ## Поддержать проект
 
-Разработка ведётся в свободное время. Если BuzzMini пригодился, можно поддержать автора (**Тимур К.**) через **[CloudTips](https://pay.cloudtips.ru/p/3fbf7934)** (карты российских банков, СБП и другие способы на странице оплаты).
+Разработка в свободное время. Если BuzzMini пригодился — поддержка **Тимура К.** через **[CloudTips](https://pay.cloudtips.ru/p/3fbf7934)** (карты РФ, СБП и другие способы на странице).
 
-В приложении: меню трея → **Donate — Донат** или вкладка **Donate** в окне Buzz Mini — та же ссылка.
+В приложении: трей → **Donate**, или вкладка **Donate**.
